@@ -16,7 +16,9 @@ import {
   Eye,
   Table as TableIcon,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileJson,
+  Layout
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -43,10 +45,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ProcessedData | null>(null);
   
-  // Real-time raw preview data
+  // Real-time raw preview data and header parsing
   const [rawPreview, setRawPreview] = useState<any[][]>([]);
   const [availableHeaders, setAvailableHeaders] = useState<string[]>([]);
   const [showSkippedRows, setShowSkippedRows] = useState(false);
+
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFileName, setExportFileName] = useState('Standardized_Tax_Data');
+  const [exportSheetName, setExportSheetName] = useState('CleanedData');
 
   // Load raw preview and headers whenever files, sheet, or startRow changes
   useEffect(() => {
@@ -64,7 +71,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[selectedSheet];
         if (worksheet) {
-          // Get raw rows for preview (starting from 0 to show context)
+          // 1. Get raw rows for preview (starting from 0 to show user context)
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: 0, 
@@ -72,15 +79,17 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           }) as any[][];
           setRawPreview(raw.slice(0, 30));
 
-          // Extract headers specifically from the selected startRow
-          const headerJson = XLSX.utils.sheet_to_json(worksheet, { 
+          // 2. Extract headers specifically from the selected startRow
+          // We use header: 1 to get an array of values for that row
+          const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: startRow, 
             defval: "" 
           }) as any[][];
           
-          if (headerJson.length > 0) {
-            const extractedHeaders = (headerJson[0] || [])
+          if (headerRows && headerRows.length > 0) {
+            // First row of the range is the header row
+            const extractedHeaders = (headerRows[0] || [])
               .map(h => String(h).trim())
               .filter(h => h !== "");
             setAvailableHeaders(extractedHeaders);
@@ -108,6 +117,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           setSheetMetadata(metadata);
           if (metadata.length > 0) {
             setSelectedSheet(metadata[0].name);
+            setExportSheetName(metadata[0].name + '_Cleaned');
           }
         }
       } catch (err) {
@@ -135,6 +145,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
       const allErrors: ValidationError[] = [];
 
       for (let i = 0; i < files.length; i++) {
+        // extractSheetData already handles 'range: startRow' internally
         const data = await extractSheetData(files[i], selectedSheet, startRow);
         
         data.forEach((rawRow, rowIdx) => {
@@ -187,6 +198,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
     }
   };
 
+  const handleExport = () => {
+    if (!results) return;
+    const worksheet = XLSX.utils.json_to_sheet(results.rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
+    XLSX.writeFile(workbook, `${exportFileName || 'export'}.xlsx`);
+    setIsExportModalOpen(false);
+  };
+
   const steps = [
     { num: 1, label: language === 'zh-CN' ? '选择定义' : 'Choose Definition' },
     { num: 2, label: language === 'zh-CN' ? '上传配置' : 'Upload & Config' },
@@ -195,9 +215,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   ];
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto pb-24 h-full">
+    <div className="p-8 max-w-[1600px] mx-auto pb-24 h-full relative">
       {/* Stepper Header */}
-      <div className="flex items-center justify-between mb-12 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm sticky top-4 z-10">
+      <div className="flex items-center justify-between mb-12 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm sticky top-4 z-40">
         {steps.map((s) => (
           <div key={s.num} className="flex items-center gap-4 px-4 flex-1 justify-center last:flex-none">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
@@ -217,7 +237,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
       {step === 1 && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-black text-slate-800">{t.title}</h2>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.title}</h2>
             <p className="text-slate-500 mt-2 font-medium">{t.subtitle}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -264,7 +284,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
             <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
               <Upload className="w-10 h-10 text-indigo-600" />
             </div>
-            <h3 className="text-2xl font-black text-slate-800">{t.uploadTitle}</h3>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.uploadTitle}</h3>
             <p className="text-slate-500 mt-2 font-medium">{t.uploadSubtitle}</p>
             {files.length > 0 && (
               <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -297,7 +317,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                     <select 
                       value={selectedSheet}
                       onChange={(e) => setSelectedSheet(e.target.value)}
-                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 bg-white outline-none transition-all font-bold text-slate-700 shadow-sm"
+                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 bg-white outline-none transition-all font-bold text-slate-700 shadow-sm cursor-pointer"
                     >
                       {sheetMetadata.map(s => (
                         <option key={s.name} value={s.name}>{s.name}</option>
@@ -316,7 +336,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 bg-white outline-none transition-all font-black text-center text-2xl shadow-sm text-indigo-600"
                       />
                     </div>
-                    <p className="text-xs text-slate-400 font-bold italic">
+                    <p className="text-xs text-slate-400 font-bold italic leading-snug">
                       {language === 'zh-CN' ? '指示表头所在的Excel行数 (0开始计数)' : 'Indicates which row contains the actual headers (0-indexed).'}
                     </p>
                   </div>
@@ -343,10 +363,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                   <div className="flex items-center gap-4">
                     <button 
                       onClick={() => setShowSkippedRows(!showSkippedRows)}
-                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 ${
+                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${
                         showSkippedRows 
-                          ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
-                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-800'
+                          ? 'bg-slate-800 text-white border-slate-800' 
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-800 hover:bg-slate-50'
                       }`}
                     >
                       {showSkippedRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -358,7 +378,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-500">
+                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-500 relative">
                   <div className="overflow-auto custom-scrollbar max-h-[600px]">
                     <table className="w-full text-left text-[11px] border-separate border-spacing-0">
                       <thead className="bg-slate-50 sticky top-0 z-20">
@@ -371,19 +391,19 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium transition-all">
-                        {/* Compression logic: If not showSkippedRows and startRow > 0, show a summary row */}
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {/* Summary for hidden rows */}
                         {!showSkippedRows && startRow > 0 && (
                           <tr className="bg-slate-50/30 group">
                             <td 
                               colSpan={(rawPreview[0]?.length || 0) + 1} 
-                              className="px-6 py-6 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
+                              className="px-6 py-8 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
                               onClick={() => setShowSkippedRows(true)}
                             >
                               <div className="flex flex-col items-center justify-center gap-2">
-                                <ChevronDown className="w-5 h-5 animate-bounce" />
-                                <span className="font-black uppercase tracking-widest text-[10px]">
-                                  {language === 'zh-CN' ? `已收起上方 ${startRow} 行配置外数据 (点击展开查看详情)` : `${startRow} leading rows compressed (click to expand)`}
+                                <ChevronDown className="w-5 h-5 animate-bounce text-indigo-400" />
+                                <span className="font-black uppercase tracking-widest text-[10px] text-slate-400">
+                                  {language === 'zh-CN' ? `已收起上方 ${startRow} 行冗余数据 (点击展开)` : `${startRow} leading rows compressed (click to expand)`}
                                 </span>
                               </div>
                             </td>
@@ -394,7 +414,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           const isHeader = rIdx === startRow;
                           const isSkipped = rIdx < startRow;
                           
-                          // Hide rows if they are before startRow and we aren't showing skipped rows
                           if (isSkipped && !showSkippedRows) return null;
 
                           return (
@@ -429,7 +448,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                     </p>
                     {startRow > 0 && !showSkippedRows && (
                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.15em] italic">
-                        {language === 'zh-CN' ? '顶部冗余行已自动折叠以聚焦关键数据' : 'Leading rows automatically collapsed for focus.'}
+                        {language === 'zh-CN' ? '冗余行已自动折叠' : 'Leading rows automatically collapsed.'}
                       </p>
                     )}
                   </div>
@@ -485,7 +504,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                       <select 
                         value={mapping[field.id] || ''}
                         onChange={(e) => setMapping(prev => ({ ...prev, [field.id]: e.target.value }))}
-                        className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 bg-white shadow-sm appearance-none outline-none font-bold text-slate-700 transition-all"
+                        className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 bg-white shadow-sm appearance-none outline-none font-bold text-slate-700 transition-all cursor-pointer"
                       >
                         <option value="">{t.unmapped}</option>
                         {availableHeaders.map(h => (
@@ -493,7 +512,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         ))}
                       </select>
                       {availableHeaders.length === 0 && (
-                        <p className="text-[10px] text-red-400 mt-2 font-black uppercase flex items-center gap-1">
+                        <p className="text-[10px] text-red-400 mt-2 font-black uppercase flex items-center gap-1 animate-pulse">
                           <AlertCircle className="w-3 h-3" />
                           {language === 'zh-CN' ? '未找到列名，请返回确认表头索引' : 'No headers found, check header index.'}
                         </p>
@@ -515,7 +534,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           <div className="flex justify-between items-center pt-8">
             <button 
               onClick={() => setStep(2)}
-              className="text-slate-400 hover:text-slate-800 font-black px-6 py-3 transition-colors uppercase tracking-widest text-sm"
+              className="text-slate-400 hover:text-slate-800 font-black px-6 py-3 transition-colors uppercase tracking-widest text-sm flex items-center gap-2"
             >
               &larr; {language === 'zh-CN' ? '返回配置' : 'Back to Config'}
             </button>
@@ -551,11 +570,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                 {Math.max(0, 100 - (results.errors.length / (results.rows.length * (selectedDef?.fields.length || 1)) * 100)).toFixed(1)}%
               </h3>
             </div>
-            <div className="bg-indigo-600 p-8 rounded-[40px] shadow-2xl shadow-indigo-100 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-indigo-700 transition-all transform hover:-translate-y-1 group">
+            <button 
+              onClick={() => setIsExportModalOpen(true)}
+              className="bg-indigo-600 p-8 rounded-[40px] shadow-2xl shadow-indigo-100 flex flex-col justify-center items-center text-center cursor-pointer hover:bg-indigo-700 transition-all transform hover:-translate-y-1 group active:scale-95"
+            >
               <Download className="w-10 h-10 text-white/90 mb-3 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-black text-white uppercase tracking-widest mb-1">{t.export}</p>
+              <p className="text-sm font-black text-white uppercase tracking-widest mb-1">{language === 'zh-CN' ? '导出清洗后的数据' : t.export}</p>
               <p className="text-xs text-white/60 font-medium">{t.readyERP}</p>
-            </div>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
@@ -637,6 +659,81 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
             >
               {t.initNew}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Export Settings Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300 backdrop-blur-sm bg-slate-900/40">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-100 p-2.5 rounded-2xl">
+                  <Download className="w-6 h-6 text-indigo-600" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '导出设置' : 'Export Settings'}</h2>
+              </div>
+              <button 
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-800 bg-white border border-slate-100 rounded-xl transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-8">
+              <div className="space-y-4">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
+                <div className="relative group">
+                  <FileJson className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    value={exportFileName}
+                    onChange={(e) => setExportFileName(e.target.value)}
+                    className="w-full pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-slate-700 bg-slate-50/30"
+                    placeholder="Standardized_Output"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
+                <div className="relative group">
+                  <Layout className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    value={exportSheetName}
+                    onChange={(e) => setExportSheetName(e.target.value)}
+                    className="w-full pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-slate-700 bg-slate-50/30"
+                    placeholder="Cleaned_Data"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex gap-4">
+                <Info className="w-6 h-6 text-amber-500 shrink-0" />
+                <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                  {language === 'zh-CN' ? '文件将保存到您的默认下载文件夹中。' : 'The file will be saved to your default system downloads folder.'}
+                </p>
+              </div>
+
+              <div className="pt-4 flex gap-4">
+                <button 
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="flex-1 px-8 py-5 border-2 border-slate-200 text-slate-500 rounded-[28px] font-black hover:bg-slate-50 transition-all uppercase tracking-widest text-xs"
+                >
+                  {language === 'zh-CN' ? '取消' : 'Cancel'}
+                </button>
+                <button 
+                  onClick={handleExport}
+                  className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[28px] shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 uppercase tracking-widest text-xs"
+                >
+                  <Download className="w-5 h-5" />
+                  {language === 'zh-CN' ? '立即导出' : 'Download Now'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
