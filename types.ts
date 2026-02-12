@@ -44,3 +44,15 @@ export interface ProcessedData {
   rows: any[];
   errors: ValidationError[];
 }
+
+export interface TransformationTemplate {
+  id: string;
+  name: string;
+  definitionId: string;
+  sheetName: string;
+  startRow: number;
+  mapping: Mapping;
+  exportFileName: string;
+  exportSheetName: string;
+  updatedAt: string;
+}

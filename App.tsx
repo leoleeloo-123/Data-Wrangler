@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import DefinitionManager from './components/DefinitionManager';
 import TransformWizard from './components/TransformWizard';
-import { DataDefinition, FieldType } from './types';
+import { DataDefinition, FieldType, TransformationTemplate } from './types';
 import { translations } from './translations';
 import { 
   LayoutDashboard, 
@@ -23,6 +23,7 @@ import {
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [definitions, setDefinitions] = useState<DataDefinition[]>([]);
+  const [templates, setTemplates] = useState<TransformationTemplate[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   
   // System Config State
@@ -33,9 +34,9 @@ const App: React.FC = () => {
 
   // Initialize with dummy data if empty
   useEffect(() => {
-    const saved = localStorage.getItem('tax-definitions');
-    if (saved) {
-      setDefinitions(JSON.parse(saved));
+    const savedDefs = localStorage.getItem('tax-definitions');
+    if (savedDefs) {
+      setDefinitions(JSON.parse(savedDefs));
     } else {
       const initial: DataDefinition[] = [
         {
@@ -53,6 +54,11 @@ const App: React.FC = () => {
       ];
       setDefinitions(initial);
       localStorage.setItem('tax-definitions', JSON.stringify(initial));
+    }
+
+    const savedTemplates = localStorage.getItem('tax-transformation-templates');
+    if (savedTemplates) {
+      setTemplates(JSON.parse(savedTemplates));
     }
   }, []);
 
@@ -74,12 +80,38 @@ const App: React.FC = () => {
     localStorage.setItem('tax-definitions', JSON.stringify(updated));
   };
 
+  const saveTemplate = (template: TransformationTemplate) => {
+    const exists = templates.find(t => t.id === template.id);
+    let updated;
+    if (exists) {
+      updated = templates.map(t => t.id === template.id ? template : t);
+    } else {
+      updated = [...templates, template];
+    }
+    setTemplates(updated);
+    localStorage.setItem('tax-transformation-templates', JSON.stringify(updated));
+  };
+
+  const deleteTemplate = (id: string) => {
+    const updated = templates.filter(t => t.id !== id);
+    setTemplates(updated);
+    localStorage.setItem('tax-transformation-templates', JSON.stringify(updated));
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'definitions':
         return <DefinitionManager definitions={definitions} onSave={saveDefinition} onDelete={deleteDefinition} language={language} />;
       case 'import':
-        return <TransformWizard definitions={definitions} language={language} />;
+        return (
+          <TransformWizard 
+            definitions={definitions} 
+            templates={templates} 
+            onSaveTemplate={saveTemplate} 
+            onDeleteTemplate={deleteTemplate}
+            language={language} 
+          />
+        );
       case 'history':
         return (
           <div className="p-8 max-w-[1600px] mx-auto">

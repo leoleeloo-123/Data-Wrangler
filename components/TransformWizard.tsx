@@ -19,9 +19,11 @@ import {
   ChevronUp,
   FileJson,
   Layout as LayoutIcon,
-  Save
+  Save,
+  Trash2,
+  Bookmark
 } from 'lucide-react';
-import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType } from '../types';
+import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
 import { suggestMappings } from '../services/geminiService';
 import { translations } from '../translations';
@@ -31,10 +33,19 @@ declare const XLSX: any;
 
 interface TransformWizardProps {
   definitions: DataDefinition[];
+  templates: TransformationTemplate[];
+  onSaveTemplate: (template: TransformationTemplate) => void;
+  onDeleteTemplate: (id: string) => void;
   language: 'en-US' | 'zh-CN';
 }
 
-const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language }) => {
+const TransformWizard: React.FC<TransformWizardProps> = ({ 
+  definitions, 
+  templates, 
+  onSaveTemplate, 
+  onDeleteTemplate,
+  language 
+}) => {
   const t = translations[language].transform;
   const [step, setStep] = useState(1);
   const [selectedDef, setSelectedDef] = useState<DataDefinition | null>(null);
@@ -56,6 +67,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   const [exportFileName, setExportFileName] = useState('Standardized_Tax_Data');
   const [exportSheetName, setExportSheetName] = useState('StandardizedData');
 
+  // Template Modal State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+
   // Sync state between steps
   useEffect(() => {
     if (files.length > 0 && selectedSheet) {
@@ -74,7 +89,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[selectedSheet];
         if (worksheet) {
-          // 1. Get raw rows for preview (always from 0 to show skip context)
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: 0, 
@@ -82,8 +96,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           }) as any[][];
           setRawPreview(raw.slice(0, 30));
 
-          // 2. Extract headers specifically from the selected startRow
-          // We must ensure startRow is treated as a number
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Number(startRow), 
@@ -117,7 +129,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         if (firstFile) {
           const metadata = await parseExcelMetadata(firstFile);
           setSheetMetadata(metadata);
-          if (metadata.length > 0) {
+          if (metadata.length > 0 && !selectedSheet) {
             setSelectedSheet(metadata[0].name);
             setExportSheetName(metadata[0].name + '_Standardized');
           }
@@ -126,6 +138,35 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         console.error("Error parsing file metadata", err);
       }
     }
+  };
+
+  const applyTemplate = (tpl: TransformationTemplate) => {
+    setSelectedSheet(tpl.sheetName);
+    setStartRow(tpl.startRow);
+    setMapping(tpl.mapping);
+    setExportFileName(tpl.exportFileName);
+    setExportSheetName(tpl.exportSheetName);
+    setStep(2); // Jump to upload with loaded settings
+  };
+
+  const handleSaveTemplate = () => {
+    if (!selectedDef || !newTemplateName) return;
+    // Fix: Explicitly map the property to the state variable selectedSheet
+    const template: TransformationTemplate = {
+      id: crypto.randomUUID(),
+      name: newTemplateName,
+      definitionId: selectedDef.id,
+      sheetName: selectedSheet,
+      startRow,
+      mapping,
+      exportFileName,
+      exportSheetName,
+      updatedAt: new Date().toISOString()
+    };
+    onSaveTemplate(template);
+    setIsTemplateModalOpen(false);
+    setNewTemplateName('');
+    alert(t.templateSaved);
   };
 
   const autoMap = async () => {
@@ -168,7 +209,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
             if (field.required && (rawValue === null || rawValue === undefined || rawValue === "")) {
               allErrors.push({
-                row: rowIdx + (Number(startRow) + 2), // Excel row index is 1-based, + skip header
+                row: rowIdx + (Number(startRow) + 2),
                 field: field.name,
                 value: rawValue,
                 message: `Required field missing in file ${files[i].name}`,
@@ -222,6 +263,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
     }
   };
 
+  const relevantTemplates = selectedDef ? templates.filter(t => t.definitionId === selectedDef.id) : [];
+
   const steps = [
     { num: 1, label: language === 'zh-CN' ? '选择定义' : 'Choose Definition' },
     { num: 2, label: language === 'zh-CN' ? '上传配置' : 'Upload & Config' },
@@ -248,41 +291,103 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         ))}
       </div>
 
-      {/* Step 1: Definition Selection */}
+      {/* Step 1: Definition Selection & Template Pick */}
       {step === 1 && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.title}</h2>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">{selectedDef ? t.template : t.title}</h2>
             <p className="text-slate-500 mt-2 font-medium">{t.subtitle}</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {definitions.map((def) => (
-              <button
-                key={def.id}
-                onClick={() => { setSelectedDef(def); setStep(2); }}
-                className={`p-6 rounded-3xl border-2 transition-all text-left flex flex-col h-full ${
-                  selectedDef?.id === def.id 
-                    ? 'border-indigo-600 bg-indigo-50/30 ring-4 ring-indigo-100' 
-                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md'
-                }`}
-              >
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 self-start mb-4">
-                  <Database className="w-6 h-6 text-indigo-600" />
+
+          {!selectedDef ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {definitions.map((def) => (
+                <button
+                  key={def.id}
+                  onClick={() => { setSelectedDef(def); }}
+                  className="p-6 rounded-3xl border-2 border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-left flex flex-col h-full"
+                >
+                  <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 self-start mb-4">
+                    <Database className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg mb-2">{def.name}</h3>
+                  <p className="text-slate-500 text-sm mb-6 line-clamp-3 flex-1">{def.description}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-auto">
+                    {def.fields.slice(0, 3).map(f => (
+                      <span key={f.id} className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-600 px-2 py-0.5 rounded">
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto space-y-8">
+              <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="bg-indigo-50 p-4 rounded-2xl">
+                    <Database className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800">{selectedDef.name}</h3>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mt-1">{selectedDef.fields.length} Fields Configured</p>
+                  </div>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg mb-2">{def.name}</h3>
-                <p className="text-slate-500 text-sm mb-6 line-clamp-3 flex-1">{def.description}</p>
-                
-                <div className="flex flex-wrap gap-1.5 mt-auto">
-                  {def.fields.slice(0, 3).map(f => (
-                    <span key={f.id} className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-600 px-2 py-0.5 rounded">
-                      {f.name}
-                    </span>
-                  ))}
-                  {def.fields.length > 3 && <span className="text-[9px] text-slate-400 font-bold self-center">+{def.fields.length - 3}</span>}
+                <button onClick={() => setSelectedDef(null)} className="p-3 text-slate-400 hover:text-slate-800 transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Start Fresh Option */}
+                <button 
+                  onClick={() => setStep(2)}
+                  className="group bg-white p-10 rounded-[40px] border-2 border-dashed border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/30 transition-all text-center space-y-4"
+                >
+                  <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto group-hover:bg-indigo-600 transition-colors">
+                    <ArrowRight className="w-8 h-8 text-slate-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight">{t.startFresh}</h4>
+                  <p className="text-slate-400 font-medium">Configure parsing logic from scratch for new file structures.</p>
+                </button>
+
+                {/* Templates Section */}
+                <div className="space-y-6">
+                  <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <Bookmark className="w-5 h-5 text-amber-500" />
+                    {t.useTemplate}
+                  </h4>
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                    {relevantTemplates.map(tpl => (
+                      <div key={tpl.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex items-center justify-between group hover:border-indigo-600 transition-all">
+                        <button 
+                          onClick={() => applyTemplate(tpl)}
+                          className="flex-1 text-left"
+                        >
+                          <p className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{tpl.name}</p>
+                          <p className="text-xs text-slate-400 font-bold mt-1">
+                            Updated {new Date(tpl.updatedAt).toLocaleDateString()} • {Object.keys(tpl.mapping).length} fields mapped
+                          </p>
+                        </button>
+                        <button 
+                          onClick={() => onDeleteTemplate(tpl.id)}
+                          className="p-2 text-slate-200 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {relevantTemplates.length === 0 && (
+                      <div className="text-center py-10 text-slate-400 italic">
+                        No saved templates for this module.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -319,12 +424,20 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
           {files.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* Settings Card */}
               <div className="lg:col-span-4 bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8 h-fit sticky top-32">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <Settings2 className="w-6 h-6 text-indigo-600" />
-                  {t.configTitle}
-                </h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                    <Settings2 className="w-6 h-6 text-indigo-600" />
+                    {t.configTitle}
+                  </h3>
+                  <button 
+                    onClick={() => setIsTemplateModalOpen(true)}
+                    className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
+                    title={t.saveTemplate}
+                  >
+                    <Save className="w-5 h-5" />
+                  </button>
+                </div>
                 
                 <div className="space-y-8">
                   <div className="space-y-3">
@@ -351,9 +464,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 bg-white outline-none transition-all font-black text-center text-2xl shadow-sm text-indigo-600"
                       />
                     </div>
-                    <p className="text-xs text-slate-400 font-bold italic leading-snug">
-                      {language === 'zh-CN' ? '指示表头所在的Excel行数 (0开始计数)' : 'Indicates which row contains the actual headers (0-indexed).'}
-                    </p>
                   </div>
                 </div>
 
@@ -368,30 +478,22 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                 </div>
               </div>
 
-              {/* Real-time Preview Card */}
               <div className="lg:col-span-8 space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
                     <Eye className="w-6 h-6 text-emerald-500" />
                     {t.previewTitle}
                   </h3>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => setShowSkippedRows(!showSkippedRows)}
-                      disabled={startRow === 0}
-                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed ${
-                        showSkippedRows 
-                          ? 'bg-slate-800 text-white border-slate-800' 
-                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-800 hover:bg-slate-50'
-                      }`}
-                    >
-                      {showSkippedRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      {language === 'zh-CN' ? (showSkippedRows ? '显示顶部行' : '隐藏顶部行') : (showSkippedRows ? 'Show Skipped' : 'Hide Skipped')}
-                    </button>
-                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">
-                      {language === 'zh-CN' ? '文件: ' : 'File: '} {files[0]?.name}
-                    </span>
-                  </div>
+                  <button 
+                    onClick={() => setShowSkippedRows(!showSkippedRows)}
+                    disabled={startRow === 0}
+                    className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-sm disabled:opacity-30 ${
+                      showSkippedRows ? 'bg-slate-800 text-white' : 'bg-white text-slate-500'
+                    }`}
+                  >
+                    {showSkippedRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    {language === 'zh-CN' ? (showSkippedRows ? '显示顶部行' : '隐藏顶部行') : (showSkippedRows ? 'Show Skipped' : 'Hide Skipped')}
+                  </button>
                 </div>
                 
                 <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-500 relative">
@@ -408,7 +510,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium transition-all">
-                        {/* Summary for hidden rows */}
                         {!showSkippedRows && startRow > 0 && (
                           <tr className="bg-slate-50/30 group">
                             <td 
@@ -416,57 +517,27 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                               className="px-6 py-8 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
                               onClick={() => setShowSkippedRows(true)}
                             >
-                              <div className="flex flex-col items-center justify-center gap-2">
-                                <ChevronDown className="w-5 h-5 animate-bounce text-indigo-400" />
-                                <span className="font-black uppercase tracking-widest text-[10px] text-slate-400">
-                                  {language === 'zh-CN' ? `已收起上方 ${startRow} 行冗余数据 (点击展开)` : `${startRow} leading rows compressed (click to expand)`}
-                                </span>
-                              </div>
+                              <ChevronDown className="w-5 h-5 animate-bounce text-indigo-400 mx-auto" />
+                              <span className="font-black uppercase tracking-widest text-[10px] mt-2 block">
+                                {language === 'zh-CN' ? `已收起上方 ${startRow} 行冗余数据` : `${startRow} leading rows compressed`}
+                              </span>
                             </td>
                           </tr>
                         )}
-
                         {rawPreview.map((row, rIdx) => {
                           const isHeader = rIdx === startRow;
-                          const isSkipped = rIdx < startRow;
-                          
-                          if (isSkipped && !showSkippedRows) return null;
-
+                          if (rIdx < startRow && !showSkippedRows) return null;
                           return (
-                            <tr key={rIdx} className={`transition-all duration-300 ${isHeader ? 'bg-indigo-50/50' : isSkipped ? 'opacity-40 grayscale bg-slate-50/30' : 'hover:bg-slate-50'}`}>
-                              <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                {rIdx}
-                                {isHeader && <div className="text-[8px] uppercase tracking-tighter text-indigo-400 mt-0.5">Header</div>}
-                              </td>
+                            <tr key={rIdx} className={`transition-all duration-300 ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-40 grayscale' : 'hover:bg-slate-50'}`}>
+                              <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>{rIdx}</td>
                               {row.map((cell: any, cIdx: number) => (
-                                <td key={cIdx} className={`px-6 py-3 whitespace-nowrap truncate max-w-[200px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>
-                                  {cell !== null && cell !== "" ? String(cell) : <span className="text-slate-300 italic opacity-40">-</span>}
-                                </td>
+                                <td key={cIdx} className={`px-6 py-3 whitespace-nowrap truncate max-w-[200px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>
                               ))}
                             </tr>
                           );
                         })}
-                        {rawPreview.length === 0 && (
-                          <tr>
-                            <td colSpan={20} className="px-10 py-32 text-center text-slate-300">
-                              <TableIcon className="w-12 h-12 mx-auto mb-4 opacity-10" />
-                              <p className="font-bold">No preview available for the selected sheet.</p>
-                            </td>
-                          </tr>
-                        )}
                       </tbody>
                     </table>
-                  </div>
-                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Info className="w-3.5 h-3.5" />
-                      {language === 'zh-CN' ? '预览中深蓝色高亮的行为提取的表头' : 'Darker rows highlight the selected header row.'}
-                    </p>
-                    {startRow > 0 && !showSkippedRows && (
-                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.15em] italic">
-                        {language === 'zh-CN' ? '冗余行已自动折叠以聚焦核心表格' : 'Leading rows automatically collapsed for focus.'}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -483,14 +554,23 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
               <h2 className="text-3xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '字段映射架构' : t.mappingTitle}</h2>
               <p className="text-slate-500 font-medium">{t.mappingSubtitle}</p>
             </div>
-            <button 
-              onClick={autoMap}
-              disabled={isProcessing || availableHeaders.length === 0}
-              className="bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-3.5 rounded-2xl font-black flex items-center gap-3 transition-all disabled:opacity-50 shadow-sm"
-            >
-              {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-              {t.autoMap}
-            </button>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setIsTemplateModalOpen(true)}
+                className="bg-white border-2 border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 px-6 py-3.5 rounded-2xl font-black flex items-center gap-3 transition-all shadow-sm"
+              >
+                <Save className="w-5 h-5" />
+                {t.saveTemplate}
+              </button>
+              <button 
+                onClick={autoMap}
+                disabled={isProcessing || availableHeaders.length === 0}
+                className="bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-3.5 rounded-2xl font-black flex items-center gap-3 transition-all disabled:opacity-50 shadow-sm"
+              >
+                {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                {t.autoMap}
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
@@ -527,12 +607,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
-                      {availableHeaders.length === 0 && (
-                        <p className="text-[10px] text-red-400 mt-2 font-black uppercase flex items-center gap-1 animate-pulse">
-                          <AlertCircle className="w-3 h-3" />
-                          {language === 'zh-CN' ? '未找到列名，请返回确认表头索引' : 'No headers found, check header index.'}
-                        </p>
-                      )}
                     </td>
                     <td className="px-10 py-8 text-center">
                       {field.required ? (
@@ -670,7 +744,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
           <div className="flex justify-center pt-8">
             <button 
-              onClick={() => { setStep(1); setResults(null); }}
+              onClick={() => { setStep(1); setResults(null); setSelectedDef(null); }}
               className="px-10 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-[28px] font-black hover:border-indigo-300 hover:text-indigo-600 transition-all transform hover:-translate-y-1"
             >
               {t.initNew}
@@ -708,7 +782,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                     value={exportFileName}
                     onChange={(e) => setExportFileName(e.target.value)}
                     className="w-full pl-14 pr-6 py-5 border border-slate-200 rounded-3xl focus:ring-8 focus:ring-indigo-100 outline-none transition-all font-black text-lg text-slate-700 bg-slate-50/50"
-                    placeholder="Standardized_Tax_Data"
                   />
                 </div>
               </div>
@@ -722,33 +795,58 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                     value={exportSheetName}
                     onChange={(e) => setExportSheetName(e.target.value)}
                     className="w-full pl-14 pr-6 py-5 border border-slate-200 rounded-3xl focus:ring-8 focus:ring-indigo-100 outline-none transition-all font-black text-lg text-slate-700 bg-slate-50/50"
-                    placeholder="Standardized_Output"
                   />
                 </div>
               </div>
 
-              <div className="bg-indigo-50 p-6 rounded-[32px] border border-indigo-100 flex gap-5">
-                <div className="bg-indigo-600 p-2 rounded-xl shrink-0 h-fit">
-                  <Info className="w-5 h-5 text-white" />
-                </div>
-                <p className="text-sm text-indigo-900 font-bold leading-relaxed">
-                  {language === 'zh-CN' ? '系统将根据您的选择自动生成标准化Excel文件并保存至默认下载路径。' : 'The system will generate a standardized Excel file and save it to your local downloads folder.'}
-                </p>
-              </div>
-
               <div className="pt-4 flex gap-5">
-                <button 
-                  onClick={() => setIsExportModalOpen(false)}
-                  className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-[32px] font-black hover:bg-slate-50 transition-all uppercase tracking-widest text-xs"
-                >
+                <button onClick={() => setIsExportModalOpen(false)} className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-[32px] font-black hover:bg-slate-50 uppercase tracking-widest text-xs">
                   {language === 'zh-CN' ? '取消' : 'Cancel'}
                 </button>
-                <button 
-                  onClick={handleExport}
-                  className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[32px] shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-4 transform hover:-translate-y-1 uppercase tracking-widest text-xs"
-                >
+                <button onClick={handleExport} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[32px] shadow-2xl transition-all flex items-center justify-center gap-4 transform hover:-translate-y-1 uppercase tracking-widest text-xs">
                   <Download className="w-5 h-5" />
                   {language === 'zh-CN' ? '立即导出' : 'Download Now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Template Modal */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300 backdrop-blur-md bg-slate-900/60">
+          <div className="bg-white w-full max-w-lg rounded-[48px] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-100 p-3 rounded-2xl">
+                  <Bookmark className="w-6 h-6 text-amber-600" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">{t.saveTemplate}</h2>
+              </div>
+              <button onClick={() => setIsTemplateModalOpen(false)} className="p-3 text-slate-400 hover:text-slate-800 bg-white border border-slate-100 rounded-2xl transition-all shadow-sm">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-10 space-y-8">
+              <div className="space-y-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.templateName}</label>
+                <input 
+                  type="text" 
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  className="w-full px-6 py-5 border border-slate-200 rounded-3xl focus:ring-8 focus:ring-indigo-100 outline-none transition-all font-black text-lg text-slate-700 bg-slate-50/50"
+                  placeholder="Monthly VAT Parsing Logic"
+                />
+              </div>
+              <div className="flex gap-5">
+                <button onClick={() => setIsTemplateModalOpen(false)} className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-[32px] font-black hover:bg-slate-50 uppercase tracking-widest text-xs">
+                  {language === 'zh-CN' ? '取消' : 'Cancel'}
+                </button>
+                <button onClick={handleSaveTemplate} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[32px] shadow-2xl transition-all flex items-center justify-center gap-4 transform hover:-translate-y-1 uppercase tracking-widest text-xs">
+                  <Save className="w-5 h-5" />
+                  {language === 'zh-CN' ? '保存模板' : 'Save Template'}
                 </button>
               </div>
             </div>

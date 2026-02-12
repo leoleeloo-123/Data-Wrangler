@@ -2,21 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldDefinition } from "../types";
 
-// Safety check for process.env in browser environments
-const getApiKey = () => {
-  try {
-    return (typeof process !== 'undefined' && process.env) ? process.env.API_KEY || '' : '';
-  } catch (e) {
-    return '';
-  }
-};
-
 export const suggestMappings = async (
   targetFields: FieldDefinition[],
   sourceColumns: string[]
 ): Promise<Record<string, string>> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  // Use the API key directly from process.env.API_KEY as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
@@ -30,11 +21,19 @@ export const suggestMappings = async (
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
-          additionalProperties: { type: Type.STRING }
+          // Correctly define properties for Type.OBJECT as it cannot be empty
+          properties: targetFields.reduce((acc, field) => {
+            acc[field.id] = { 
+              type: Type.STRING,
+              description: `Matching source column for ${field.name}`
+            };
+            return acc;
+          }, {} as Record<string, any>)
         }
       }
     });
 
+    // Use response.text property directly
     const result = JSON.parse(response.text || "{}");
     return result;
   } catch (error) {
