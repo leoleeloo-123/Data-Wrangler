@@ -116,17 +116,27 @@ const App: React.FC = () => {
     
     // Process Definitions
     const defData = definitions.map(d => ({
-      ...d,
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      createdAt: d.createdAt,
       fields: JSON.stringify(d.fields)
     }));
     const defSheet = XLSX.utils.json_to_sheet(defData);
     XLSX.utils.book_append_sheet(wb, defSheet, "Definitions");
 
     // Process Templates
-    const templateData = templates.map(t => ({
-      ...t,
-      mapping: JSON.stringify(t.mapping),
-      expectedHeaders: JSON.stringify(t.expectedHeaders || [])
+    const templateData = templates.map(tpl => ({
+      id: tpl.id,
+      name: tpl.name,
+      definitionId: tpl.definitionId,
+      sheetName: tpl.sheetName,
+      startRow: tpl.startRow,
+      exportFileName: tpl.exportFileName,
+      exportSheetName: tpl.exportSheetName,
+      updatedAt: tpl.updatedAt,
+      mapping: JSON.stringify(tpl.mapping),
+      expectedHeaders: JSON.stringify(tpl.expectedHeaders || [])
     }));
     const templateSheet = XLSX.utils.json_to_sheet(templateData);
     XLSX.utils.book_append_sheet(wb, templateSheet, "Templates");
@@ -149,7 +159,7 @@ const App: React.FC = () => {
           const raw = XLSX.utils.sheet_to_json(defSheet);
           newDefs = raw.map((r: any) => ({
             ...r,
-            fields: JSON.parse(r.fields)
+            fields: typeof r.fields === 'string' ? JSON.parse(r.fields) : r.fields
           }));
         }
 
@@ -160,8 +170,8 @@ const App: React.FC = () => {
           const raw = XLSX.utils.sheet_to_json(templateSheet);
           newTemplates = raw.map((r: any) => ({
             ...r,
-            mapping: JSON.parse(r.mapping),
-            expectedHeaders: JSON.parse(r.expectedHeaders || "[]")
+            mapping: typeof r.mapping === 'string' ? JSON.parse(r.mapping) : r.mapping,
+            expectedHeaders: typeof r.expectedHeaders === 'string' ? JSON.parse(r.expectedHeaders) : (r.expectedHeaders || [])
           }));
         }
 
@@ -196,7 +206,7 @@ const App: React.FC = () => {
         setSelectedImportFile(null);
         alert(t.dashboard.importSuccess);
       } catch (err) {
-        console.error(err);
+        console.error("Import failed:", err);
         alert(t.dashboard.importError);
       }
     };

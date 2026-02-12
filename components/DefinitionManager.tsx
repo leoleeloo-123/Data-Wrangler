@@ -46,6 +46,12 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
     setIsEditing(true);
   };
 
+  const handleDelete = (id: string) => {
+    if (window.confirm(t.deleteConfirm)) {
+      onDelete(id);
+    }
+  };
+
   const addField = () => {
     if (!currentDef) return;
     const newField: FieldDefinition = {
@@ -97,7 +103,7 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => handleEdit(def)} className="p-2 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-lg shadow-sm"><Edit2 className="w-4 h-4"/></button>
-                  <button onClick={() => onDelete(def.id)} className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-lg shadow-sm"><Trash2 className="w-4 h-4"/></button>
+                  <button onClick={() => handleDelete(def.id)} className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-lg shadow-sm"><Trash2 className="w-4 h-4"/></button>
                 </div>
               </div>
               <h3 className="text-lg font-bold text-slate-800 mb-2 truncate" title={def.name}>{def.name || 'Untitled'}</h3>

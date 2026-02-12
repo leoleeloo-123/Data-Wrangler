@@ -57,6 +57,7 @@ export const translations = {
       placeholderDesc: 'Summarize the purpose of this data structure',
       fields: 'Fields',
       created: 'Created',
+      deleteConfirm: 'Are you sure you want to delete this data definition? This will remove all associated standardization logic.',
     },
     transform: {
       title: 'Select Transformation Model',
@@ -170,6 +171,7 @@ export const translations = {
       placeholderDesc: '简述此数据结构的用途',
       fields: 'Fields',
       created: '创建于',
+      deleteConfirm: '您确定要删除此数据定义吗？这将移除所有相关的标准化解析逻辑。',
     },
     transform: {
       title: '选择转换模型',
