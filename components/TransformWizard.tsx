@@ -214,14 +214,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     if (e.target.files && e.target.files.length > 0) {
       setIsProcessing(true);
       const newFiles = Array.from(e.target.files) as File[];
-      const results: FileValidationResult[] = [];
+      const validationResults: FileValidationResult[] = [];
       
       for (const file of newFiles) {
         const res = await validateFileSchema(file);
-        results.push(res);
+        validationResults.push(res);
       }
       
-      setBatchFiles(prev => [...prev, ...results]);
+      setBatchFiles(prev => [...prev, ...validationResults]);
       setIsProcessing(false);
     }
   };
@@ -375,8 +375,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     }
   };
 
-  const relevantTemplates = selectedDef ? templates.filter(t => t.definitionId === selectedDef.id) : [];
-
   const steps = [
     { num: 1, label: language === 'zh-CN' ? '选择定义' : 'Choose Definition' },
     { num: 2, label: language === 'zh-CN' ? '解析模板' : 'Parsing Template' },
@@ -386,25 +384,70 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     { num: 6, label: language === 'zh-CN' ? '保存逻辑' : 'Save Logic' }
   ];
 
+  const canJumpToStep = (targetStep: number) => {
+    if (targetStep === 1) return true;
+    if (targetStep === 2) return !!selectedDef;
+    if (targetStep === 3) return !!selectedDef && (!!templateFile || (activeTemplate && availableHeaders.length > 0));
+    if (targetStep === 4) return !!selectedDef && Object.keys(mapping).length > 0 && availableHeaders.length > 0;
+    if (targetStep === 5) return !!results;
+    if (targetStep === 6) return !!results;
+    return false;
+  };
+
+  const handleStepClick = (num: number) => {
+    if (canJumpToStep(num)) {
+      setStep(num);
+    } else {
+      // Feedback for unclickable steps
+      const messages = {
+        'zh-CN': [
+          '请先选择一个数据定义',
+          '请先上传解析模板或选择已存逻辑',
+          '请先完成字段映射',
+          '请先上传并验证源文件',
+          '请先执行转换以查看结果'
+        ],
+        'en-US': [
+          'Please select a data definition first',
+          'Please upload a template or select a saved logic first',
+          'Please complete field mapping first',
+          'Please upload and validate source files first',
+          'Please execute transformation to see results first'
+        ]
+      };
+      const msgList = language === 'zh-CN' ? messages['zh-CN'] : messages['en-US'];
+      alert(msgList[num - 2] || 'Step unavailable');
+    }
+  };
+
+  const relevantTemplates = selectedDef ? templates.filter(t => t.definitionId === selectedDef.id) : [];
   const allBatchFilesValid = batchFiles.length > 0 && batchFiles.every(f => f.isValid);
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto pb-24 h-full relative">
-      {/* Stepper Header */}
+      {/* Stepper Header - Now Dynamic & Clickable */}
       <div className="flex items-center justify-between mb-12 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm sticky top-4 z-40">
-        {steps.map((s) => (
-          <div key={s.num} className="flex items-center gap-4 px-4 flex-1 justify-center last:flex-none">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-              step >= s.num ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'
-            }`}>
-              {step > s.num ? <CheckCircle2 className="w-5 h-5" /> : s.num}
+        {steps.map((s) => {
+          const isAccessible = canJumpToStep(s.num);
+          const isActive = step === s.num;
+          return (
+            <div 
+              key={s.num} 
+              onClick={() => handleStepClick(s.num)}
+              className={`flex items-center gap-4 px-4 flex-1 justify-center last:flex-none transition-all duration-300 ${isAccessible ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed grayscale opacity-30'}`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
+                step >= s.num ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'
+              } ${isActive ? 'ring-4 ring-indigo-100' : ''}`}>
+                {step > s.num ? <CheckCircle2 className="w-5 h-5" /> : s.num}
+              </div>
+              <span className={`text-sm font-bold hidden lg:inline transition-colors duration-300 ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'} ${isActive ? 'underline decoration-indigo-300 underline-offset-4' : ''}`}>
+                {s.label}
+              </span>
+              {s.num < 6 && <div className="h-[1px] bg-slate-100 flex-1 mx-4 hidden lg:block" />}
             </div>
-            <span className={`text-sm font-bold hidden lg:inline ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'}`}>
-              {s.label}
-            </span>
-            {s.num < 6 && <div className="h-[1px] bg-slate-100 flex-1 mx-4 hidden lg:block" />}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Step 1: Definition Selection & Template Pick */}
