@@ -231,6 +231,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setBatchFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const removeAllValid = () => {
+    setBatchFiles(prev => prev.filter(f => !f.isValid));
+  };
+
   const applyTemplate = (tpl: TransformationTemplate) => {
     const def = definitions.find(d => d.id === tpl.definitionId);
     if (!def) return;
@@ -421,7 +425,20 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   };
 
   const relevantTemplates = selectedDef ? templates.filter(t => t.definitionId === selectedDef.id) : [];
-  const allBatchFilesValid = batchFiles.length > 0 && batchFiles.every(f => f.isValid);
+  
+  const validBatchFiles = batchFiles.filter(f => f.isValid);
+  const invalidBatchFiles = batchFiles.filter(f => !f.isValid);
+  
+  const validCount = validBatchFiles.length;
+  const invalidCount = invalidBatchFiles.length;
+  const allBatchFilesValid = batchFiles.length > 0 && invalidCount === 0;
+
+  const getValidFilesString = () => {
+    if (validCount === 0) return '';
+    const names = validBatchFiles.map(f => f.fileName);
+    if (names.length <= 2) return names.join(', ');
+    return `${names.slice(0, 2).join(', ')}${language === 'zh-CN' ? ` 等 ${names.length} 个文件` : ` and ${names.length - 2} other files`}`;
+  };
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto pb-24 h-full relative">
@@ -557,26 +574,30 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                   </button>
                 </div>
                 <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-auto custom-scrollbar max-h-[600px]">
-                  <table className="w-full text-left text-[11px] border-separate border-spacing-0">
-                    <thead className="bg-slate-50 sticky top-0 z-20">
-                      <tr>
-                        <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 w-16 text-center">Row</th>
-                        {(rawPreview.length > 0 && rawPreview[startRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium transition-all">
-                      {rawPreview.map((row, rIdx) => {
-                        const isHeader = rIdx === startRow;
-                        if (rIdx < startRow && !showSkippedRows) return null;
-                        return (
-                          <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-40' : 'hover:bg-slate-50'}`}>
-                            <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>{rIdx}</td>
-                            {row.map((cell: any, cIdx: number) => <td key={cIdx} className={`px-6 py-3 whitespace-nowrap truncate max-w-[200px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>)}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {rawPreview.length > 0 ? (
+                    <table className="w-full text-left text-[11px] border-separate border-spacing-0">
+                      <thead className="bg-slate-50 sticky top-0 z-20">
+                        <tr>
+                          <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 w-16 text-center">Row</th>
+                          {(rawPreview[startRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium transition-all">
+                        {rawPreview.map((row, rIdx) => {
+                          const isHeader = rIdx === startRow;
+                          if (rIdx < startRow && !showSkippedRows) return null;
+                          return (
+                            <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-40' : 'hover:bg-slate-50'}`}>
+                              <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>{rIdx}</td>
+                              {row.map((cell: any, cIdx: number) => <td key={cIdx} className={`px-6 py-3 whitespace-nowrap truncate max-w-[200px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>)}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-20 text-center text-slate-400 font-bold">{t.noDataPreview}</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -620,9 +641,63 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
               {batchFiles.length > 0 && (
                 <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
-                  <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><Files className="w-4 h-4 text-indigo-500" />{t.validationTitle}</h3><span className="text-[10px] font-black text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">{batchFiles.length} files</span></div>
-                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">{batchFiles.map((res, i) => <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50/30 transition-colors">
-                    <div className="flex items-center gap-6 overflow-hidden"><div className={`p-3 rounded-2xl ${res.isValid ? 'bg-emerald-50' : 'bg-red-50'}`}>{res.isValid ? <Check className="w-5 h-5 text-emerald-600" /> : <AlertCircle className="w-5 h-5 text-red-500" />}</div><div className="overflow-hidden"><p className={`font-black truncate ${res.isValid ? 'text-slate-800' : 'text-red-900'}`}>{res.fileName}</p><p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${res.isValid ? 'text-emerald-500' : 'text-red-400'}`}>{res.isValid ? t.validationSuccess : res.error}</p></div></div><button onClick={() => removeBatchFile(i)} className="p-3 text-slate-200 hover:text-red-500"><Trash2 className="w-4 h-4" /></button></div>)}</div>
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><Files className="w-4 h-4 text-indigo-500" />{t.validationTitle}</h3>
+                    <div className="flex gap-4">
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">{validCount} {t.validFiles}</span>
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${invalidCount > 0 ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-400 bg-white border-slate-100'}`}>{invalidCount} {t.invalidFiles}</span>
+                    </div>
+                  </div>
+                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                    {/* Summary for Valid Files */}
+                    {validCount > 0 && (
+                      <div className="p-6 flex items-start justify-between bg-emerald-50/30 group transition-colors hover:bg-emerald-50/50">
+                        <div className="flex items-start gap-6">
+                          <div className="p-3 rounded-2xl bg-emerald-50">
+                            <Check className="w-5 h-5 text-emerald-600" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="font-black text-slate-800">{t.validationSuccess}</p>
+                            <p className="text-[11px] font-bold text-emerald-600 mt-1 max-w-full">
+                              {getValidFilesString()}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={removeAllValid}
+                          className="p-3 text-slate-200 hover:text-red-500 transition-colors"
+                          title={language === 'zh-CN' ? '移除所有有效文件' : 'Remove all valid files'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Detailed List for Invalid Files */}
+                    {invalidBatchFiles.map((res, i) => (
+                      <div key={res.fileName + i} className="p-6 flex items-center justify-between hover:bg-slate-50/30 transition-colors">
+                        <div className="flex items-center gap-6 overflow-hidden">
+                          <div className="p-3 rounded-2xl bg-red-50">
+                            <AlertCircle className="w-5 h-5 text-red-500" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="font-black truncate text-red-900">{res.fileName}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest mt-1 text-red-400">{res.error}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            // Find actual index in batchFiles
+                            const actualIdx = batchFiles.findIndex(f => f.fileName === res.fileName && f.file === res.file);
+                            if (actualIdx > -1) removeBatchFile(actualIdx);
+                          }} 
+                          className="p-3 text-slate-200 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -631,7 +706,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 {batchFiles.length === 0 ? <div className="text-center py-10"><Info className="w-12 h-12 text-slate-200 mx-auto mb-4" /><p className="text-slate-400 font-bold text-sm">{t.noFiles}</p></div> : 
                   <div className="space-y-8">
                     <div className="flex items-center gap-4"><div className={`p-4 rounded-3xl ${allBatchFilesValid ? 'bg-emerald-500' : 'bg-amber-500'} text-white`}>{allBatchFilesValid ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}</div><div><h4 className="text-xl font-black text-slate-800 tracking-tight">{allBatchFilesValid ? 'Ready' : 'Issues Detected'}</h4><p className="text-xs text-slate-500 font-medium mt-1">{allBatchFilesValid ? t.allValid : t.someInvalid}</p></div></div>
-                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-6 rounded-[32px] font-black flex items-center justify-center gap-4 shadow-2xl transition-all">{isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}{t.execute}</button>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-white/50 rounded-2xl border border-slate-100"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.validFiles}</p><p className="text-xl font-black text-emerald-600">{validCount}</p></div>
+                      <div className="p-4 bg-white/50 rounded-2xl border border-slate-100"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.invalidFiles}</p><p className={`text-xl font-black ${invalidCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>{invalidCount}</p></div>
+                    </div>
+                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-6 rounded-[32px] font-black flex items-center justify-center gap-4 shadow-2xl transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:transform-none">{isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}{t.execute}</button>
                   </div>
                 }
               </div>
@@ -653,22 +732,26 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 tracking-tight"><CheckCircle2 className="w-6 h-6 text-emerald-500" />{t.previewTitle}</h3>
               <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm flex flex-col h-[500px]">
                 <div className="flex-1 overflow-auto custom-scrollbar">
-                  <table className="w-full text-left text-[11px] border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
-                      <tr>
-                        <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50">#</th>
-                        {selectedDef?.fields.map(f => <th key={f.id} className="px-6 py-4 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">{f.name}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold">
-                      {results.rows.slice(0, 100).map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-3 text-slate-400 bg-slate-50/50">{i + 1}</td>
-                          {selectedDef?.fields.map(f => <td key={f.id} className="px-6 py-3 text-slate-600 whitespace-nowrap">{row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-300 italic">null</span>}</td>)}
+                  {results.rows.length > 0 ? (
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+                        <tr>
+                          <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50">#</th>
+                          {selectedDef?.fields.map(f => <th key={f.id} className="px-6 py-4 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">{f.name}</th>)}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold">
+                        {results.rows.slice(0, 100).map((row, i) => (
+                          <tr key={i} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-3 text-slate-400 bg-slate-50/50">{i + 1}</td>
+                            {selectedDef?.fields.map(f => <td key={f.id} className="px-6 py-3 text-slate-600 whitespace-nowrap">{row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-300 italic">null</span>}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-40 text-center text-slate-300 font-bold italic">{t.noDataPreview}</div>
+                  )}
                 </div>
               </div>
             </div>

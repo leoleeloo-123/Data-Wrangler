@@ -104,7 +104,11 @@ export const translations = {
       uploadSources: 'Upload Sources',
       allValid: 'All files validated. Ready to process.',
       someInvalid: 'Some files failed structural validation. Please correct or remove them.',
-      noFiles: 'No files uploaded.'
+      noFiles: 'No files uploaded.',
+      validFiles: 'Valid Files',
+      invalidFiles: 'Invalid Files',
+      totalFiles: 'Total Files',
+      noDataPreview: 'No data available to preview.'
     },
     config: {
       title: 'System Config',
@@ -218,7 +222,11 @@ export const translations = {
       uploadSources: '上传源文件',
       allValid: '所有文件验证通过，准备处理。',
       someInvalid: '部分文件架构验证失败，请修正或移除这些文件。',
-      noFiles: '尚未上传文件。'
+      noFiles: '尚未上传文件。',
+      validFiles: '架构一致',
+      invalidFiles: '架构不匹配',
+      totalFiles: '文件总数',
+      noDataPreview: '暂无预览数据。'
     },
     config: {
       title: '系统配置',
