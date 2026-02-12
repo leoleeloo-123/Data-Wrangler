@@ -2,11 +2,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldDefinition } from "../types";
 
+// Safety check for process.env in browser environments
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env) ? process.env.API_KEY || '' : '';
+  } catch (e) {
+    return '';
+  }
+};
+
 export const suggestMappings = async (
   targetFields: FieldDefinition[],
   sourceColumns: string[]
 ): Promise<Record<string, string>> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
