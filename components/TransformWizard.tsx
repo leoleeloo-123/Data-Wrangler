@@ -14,7 +14,9 @@ import {
   Info,
   X,
   Eye,
-  Table as TableIcon
+  Table as TableIcon,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -43,6 +45,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   
   // Real-time raw preview data
   const [rawPreview, setRawPreview] = useState<any[][]>([]);
+  const [showSkippedRows, setShowSkippedRows] = useState(false);
 
   // Load raw preview whenever files, sheet, or startRow changes
   useEffect(() => {
@@ -63,10 +66,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           // Get raw rows including headers to show user context
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
-            range: 0, // Always start from 0 for the preview so we can show context
+            range: 0, 
             defval: "" 
           });
-          setRawPreview(raw.slice(0, 15)); // Show first 15 rows for preview
+          setRawPreview(raw.slice(0, 30)); // Show more rows to handle high header indices
         }
       } catch (err) {
         console.error("Preview error", err);
@@ -317,15 +320,30 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
               {/* Real-time Preview Card */}
               <div className="lg:col-span-8 space-y-6">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <Eye className="w-6 h-6 text-emerald-500" />
-                  {t.previewTitle}
-                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest ml-auto">
-                    {language === 'zh-CN' ? '文件: ' : 'File: '} {files[0].name}
-                  </span>
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                    <Eye className="w-6 h-6 text-emerald-500" />
+                    {t.previewTitle}
+                  </h3>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setShowSkippedRows(!showSkippedRows)}
+                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 ${
+                        showSkippedRows 
+                          ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-800'
+                      }`}
+                    >
+                      {showSkippedRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      {language === 'zh-CN' ? (showSkippedRows ? '隐藏顶部行' : '显示顶部行') : (showSkippedRows ? 'Hide Skipped' : 'Show Skipped')}
+                    </button>
+                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">
+                      {language === 'zh-CN' ? '文件: ' : 'File: '} {files[0].name}
+                    </span>
+                  </div>
+                </div>
                 
-                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-500">
                   <div className="overflow-auto custom-scrollbar max-h-[600px]">
                     <table className="w-full text-left text-[11px] border-separate border-spacing-0">
                       <thead className="bg-slate-50 sticky top-0 z-20">
@@ -339,11 +357,32 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
+                        {/* Compression logic: If not showSkippedRows and startRow > 0, show a summary row */}
+                        {!showSkippedRows && startRow > 0 && (
+                          <tr className="bg-slate-50/30 group">
+                            <td 
+                              colSpan={rawPreview[0]?.length + 1 || 20} 
+                              className="px-6 py-4 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
+                              onClick={() => setShowSkippedRows(true)}
+                            >
+                              <div className="flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-[10px]">
+                                <ChevronDown className="w-3 h-3" />
+                                {language === 'zh-CN' ? `已收起上方 ${startRow} 行配置外数据` : `${startRow} leading rows compressed`}
+                                <ChevronDown className="w-3 h-3" />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
                         {rawPreview.map((row, rIdx) => {
                           const isHeader = rIdx === startRow;
                           const isSkipped = rIdx < startRow;
+                          
+                          // Skip rendering if collapsed
+                          if (isSkipped && !showSkippedRows) return null;
+
                           return (
-                            <tr key={rIdx} className={`transition-colors ${isHeader ? 'bg-indigo-50/50' : isSkipped ? 'opacity-40 grayscale' : 'hover:bg-slate-50'}`}>
+                            <tr key={rIdx} className={`transition-all duration-300 ${isHeader ? 'bg-indigo-50/50' : isSkipped ? 'opacity-40 grayscale' : 'hover:bg-slate-50'}`}>
                               <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>
                                 {rIdx}
                                 {isHeader && <div className="text-[8px] uppercase tracking-tighter text-indigo-400 mt-0.5">Header</div>}
@@ -372,6 +411,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                       <Info className="w-3.5 h-3.5" />
                       {language === 'zh-CN' ? '预览中深蓝色高亮的行为提取的表头' : 'Darker rows highlight the selected header row.'}
                     </p>
+                    {startRow > 5 && !showSkippedRows && (
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.15em] italic">
+                        {language === 'zh-CN' ? '顶部冗余行已自动折叠以聚焦关键数据' : 'Leading rows automatically collapsed for focus.'}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
