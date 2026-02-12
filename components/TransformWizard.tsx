@@ -619,7 +619,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             <button 
               onClick={runTransformation}
               disabled={isProcessing}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[28px] font-black flex items-center gap-4 shadow-2xl shadow-indigo-200 transition-all transform hover:-translate-y-2 active:translate-y-0"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[28px] font-black flex items-center gap-4 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:translate-y-0"
             >
               {isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
               {language === 'zh-CN' ? '执行标准清洗' : t.execute}
@@ -816,7 +816,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Default File Name</p>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Default File Name</label>
                   <input 
                     type="text" 
                     value={exportFileName}
@@ -825,7 +825,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Default Sheet Name</p>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Default Sheet Name</label>
                   <input 
                     type="text" 
                     value={exportSheetName}
