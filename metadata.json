@@ -1,0 +1,7 @@
+{
+  "name": "TaxStandard: Internal Tax Data Transformation Tool",
+  "description": "A robust, enterprise-grade tool for cleansing and standardizing large-scale tax data. Define schemas, map Excel columns, and batch-process files with built-in validation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
