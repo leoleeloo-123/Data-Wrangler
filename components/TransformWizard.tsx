@@ -18,14 +18,15 @@ import {
   ChevronDown,
   ChevronUp,
   FileJson,
-  Layout
+  Layout as LayoutIcon,
+  Save
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
 import { suggestMappings } from '../services/geminiService';
 import { translations } from '../translations';
 
-// Excel utility usually provided globally in index.html
+// Excel utility provided globally in index.html
 declare const XLSX: any;
 
 interface TransformWizardProps {
@@ -53,9 +54,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileName, setExportFileName] = useState('Standardized_Tax_Data');
-  const [exportSheetName, setExportSheetName] = useState('CleanedData');
+  const [exportSheetName, setExportSheetName] = useState('StandardizedData');
 
-  // Load raw preview and headers whenever files, sheet, or startRow changes
+  // Sync state between steps
   useEffect(() => {
     if (files.length > 0 && selectedSheet) {
       loadDataAndHeaders();
@@ -64,6 +65,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
   const loadDataAndHeaders = async () => {
     const file = files[0];
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -71,7 +74,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[selectedSheet];
         if (worksheet) {
-          // 1. Get raw rows for preview (starting from 0 to show user context)
+          // 1. Get raw rows for preview (always from 0 to show skip context)
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: 0, 
@@ -80,15 +83,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           setRawPreview(raw.slice(0, 30));
 
           // 2. Extract headers specifically from the selected startRow
-          // We use header: 1 to get an array of values for that row
+          // We must ensure startRow is treated as a number
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
-            range: startRow, 
+            range: Number(startRow), 
             defval: "" 
           }) as any[][];
           
           if (headerRows && headerRows.length > 0) {
-            // First row of the range is the header row
             const extractedHeaders = (headerRows[0] || [])
               .map(h => String(h).trim())
               .filter(h => h !== "");
@@ -98,7 +100,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           }
         }
       } catch (err) {
-        console.error("Data loading error", err);
+        console.error("Data preview loading error", err);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -117,7 +119,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           setSheetMetadata(metadata);
           if (metadata.length > 0) {
             setSelectedSheet(metadata[0].name);
-            setExportSheetName(metadata[0].name + '_Cleaned');
+            setExportSheetName(metadata[0].name + '_Standardized');
           }
         }
       } catch (err) {
@@ -127,12 +129,20 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   };
 
   const autoMap = async () => {
-    if (!selectedDef || availableHeaders.length === 0) return;
+    if (!selectedDef || availableHeaders.length === 0) {
+      alert(language === 'zh-CN' ? '请先在步骤2选择正确的表头行' : 'Please select a valid header row in Step 2 first');
+      return;
+    }
     
     setIsProcessing(true);
-    const suggestions = await suggestMappings(selectedDef.fields, availableHeaders);
-    setMapping(suggestions);
-    setIsProcessing(false);
+    try {
+      const suggestions = await suggestMappings(selectedDef.fields, availableHeaders);
+      setMapping(suggestions);
+    } catch (err) {
+      console.error("Auto-mapping failed", err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const runTransformation = async () => {
@@ -145,8 +155,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
       const allErrors: ValidationError[] = [];
 
       for (let i = 0; i < files.length; i++) {
-        // extractSheetData already handles 'range: startRow' internally
-        const data = await extractSheetData(files[i], selectedSheet, startRow);
+        const data = await extractSheetData(files[i], selectedSheet, Number(startRow));
         
         data.forEach((rawRow, rowIdx) => {
           const processedRow: any = {};
@@ -159,7 +168,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
             if (field.required && (rawValue === null || rawValue === undefined || rawValue === "")) {
               allErrors.push({
-                row: rowIdx + (startRow + 1),
+                row: rowIdx + (Number(startRow) + 2), // Excel row index is 1-based, + skip header
                 field: field.name,
                 value: rawValue,
                 message: `Required field missing in file ${files[i].name}`,
@@ -171,7 +180,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
               const numValue = Number(rawValue);
               if (isNaN(numValue)) {
                 allErrors.push({
-                  row: rowIdx + (startRow + 1),
+                  row: rowIdx + (Number(startRow) + 2),
                   field: field.name,
                   value: rawValue,
                   message: `Non-numeric value in numeric field in file ${files[i].name}`,
@@ -193,6 +202,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
       setStep(4);
     } catch (err) {
       console.error("Transformation Error", err);
+      alert(language === 'zh-CN' ? '转换过程中发生错误' : 'An error occurred during transformation');
     } finally {
       setIsProcessing(false);
     }
@@ -200,11 +210,16 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
   const handleExport = () => {
     if (!results) return;
-    const worksheet = XLSX.utils.json_to_sheet(results.rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
-    XLSX.writeFile(workbook, `${exportFileName || 'export'}.xlsx`);
-    setIsExportModalOpen(false);
+    try {
+      const worksheet = XLSX.utils.json_to_sheet(results.rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
+      XLSX.writeFile(workbook, `${exportFileName || 'Standardized_Data'}.xlsx`);
+      setIsExportModalOpen(false);
+    } catch (err) {
+      console.error("Export failed", err);
+      alert(language === 'zh-CN' ? '导出失败，请检查设置' : 'Export failed, check settings');
+    }
   };
 
   const steps = [
@@ -363,7 +378,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                   <div className="flex items-center gap-4">
                     <button 
                       onClick={() => setShowSkippedRows(!showSkippedRows)}
-                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${
+                      disabled={startRow === 0}
+                      className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed ${
                         showSkippedRows 
                           ? 'bg-slate-800 text-white border-slate-800' 
                           : 'bg-white text-slate-500 border-slate-200 hover:border-slate-800 hover:bg-slate-50'
@@ -391,7 +407,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
+                      <tbody className="divide-y divide-slate-100 font-medium transition-all">
                         {/* Summary for hidden rows */}
                         {!showSkippedRows && startRow > 0 && (
                           <tr className="bg-slate-50/30 group">
@@ -448,7 +464,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                     </p>
                     {startRow > 0 && !showSkippedRows && (
                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.15em] italic">
-                        {language === 'zh-CN' ? '冗余行已自动折叠' : 'Leading rows automatically collapsed.'}
+                        {language === 'zh-CN' ? '冗余行已自动折叠以聚焦核心表格' : 'Leading rows automatically collapsed for focus.'}
                       </p>
                     )}
                   </div>
@@ -665,69 +681,71 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
       {/* Export Settings Modal */}
       {isExportModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300 backdrop-blur-sm bg-slate-900/40">
-          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300 backdrop-blur-md bg-slate-900/60">
+          <div className="bg-white w-full max-w-lg rounded-[48px] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="bg-indigo-100 p-2.5 rounded-2xl">
-                  <Download className="w-6 h-6 text-indigo-600" />
+                <div className="bg-indigo-100 p-3 rounded-2xl">
+                  <Save className="w-6 h-6 text-indigo-600" />
                 </div>
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '导出设置' : 'Export Settings'}</h2>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '导出配置' : 'Export Configuration'}</h2>
               </div>
               <button 
                 onClick={() => setIsExportModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-800 bg-white border border-slate-100 rounded-xl transition-all"
+                className="p-3 text-slate-400 hover:text-slate-800 bg-white border border-slate-100 rounded-2xl transition-all shadow-sm"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
             
-            <div className="p-8 space-y-8">
+            <div className="p-10 space-y-10">
               <div className="space-y-4">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
                 <div className="relative group">
-                  <FileJson className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <FileJson className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                   <input 
                     type="text" 
                     value={exportFileName}
                     onChange={(e) => setExportFileName(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-slate-700 bg-slate-50/30"
+                    className="w-full pl-14 pr-6 py-5 border border-slate-200 rounded-3xl focus:ring-8 focus:ring-indigo-100 outline-none transition-all font-black text-lg text-slate-700 bg-slate-50/50"
+                    placeholder="Standardized_Tax_Data"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
+                <div className="relative group">
+                  <LayoutIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    value={exportSheetName}
+                    onChange={(e) => setExportSheetName(e.target.value)}
+                    className="w-full pl-14 pr-6 py-5 border border-slate-200 rounded-3xl focus:ring-8 focus:ring-indigo-100 outline-none transition-all font-black text-lg text-slate-700 bg-slate-50/50"
                     placeholder="Standardized_Output"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
-                <div className="relative group">
-                  <Layout className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                  <input 
-                    type="text" 
-                    value={exportSheetName}
-                    onChange={(e) => setExportSheetName(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-slate-700 bg-slate-50/30"
-                    placeholder="Cleaned_Data"
-                  />
+              <div className="bg-indigo-50 p-6 rounded-[32px] border border-indigo-100 flex gap-5">
+                <div className="bg-indigo-600 p-2 rounded-xl shrink-0 h-fit">
+                  <Info className="w-5 h-5 text-white" />
                 </div>
-              </div>
-
-              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex gap-4">
-                <Info className="w-6 h-6 text-amber-500 shrink-0" />
-                <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                  {language === 'zh-CN' ? '文件将保存到您的默认下载文件夹中。' : 'The file will be saved to your default system downloads folder.'}
+                <p className="text-sm text-indigo-900 font-bold leading-relaxed">
+                  {language === 'zh-CN' ? '系统将根据您的选择自动生成标准化Excel文件并保存至默认下载路径。' : 'The system will generate a standardized Excel file and save it to your local downloads folder.'}
                 </p>
               </div>
 
-              <div className="pt-4 flex gap-4">
+              <div className="pt-4 flex gap-5">
                 <button 
                   onClick={() => setIsExportModalOpen(false)}
-                  className="flex-1 px-8 py-5 border-2 border-slate-200 text-slate-500 rounded-[28px] font-black hover:bg-slate-50 transition-all uppercase tracking-widest text-xs"
+                  className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-[32px] font-black hover:bg-slate-50 transition-all uppercase tracking-widest text-xs"
                 >
                   {language === 'zh-CN' ? '取消' : 'Cancel'}
                 </button>
                 <button 
                   onClick={handleExport}
-                  className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[28px] shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 uppercase tracking-widest text-xs"
+                  className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[32px] shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-4 transform hover:-translate-y-1 uppercase tracking-widest text-xs"
                 >
                   <Download className="w-5 h-5" />
                   {language === 'zh-CN' ? '立即导出' : 'Download Now'}
