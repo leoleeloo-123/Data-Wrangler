@@ -45,16 +45,17 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
   
   // Real-time raw preview data
   const [rawPreview, setRawPreview] = useState<any[][]>([]);
+  const [availableHeaders, setAvailableHeaders] = useState<string[]>([]);
   const [showSkippedRows, setShowSkippedRows] = useState(false);
 
-  // Load raw preview whenever files, sheet, or startRow changes
+  // Load raw preview and headers whenever files, sheet, or startRow changes
   useEffect(() => {
     if (files.length > 0 && selectedSheet) {
-      loadRawPreview();
+      loadDataAndHeaders();
     }
   }, [files, selectedSheet, startRow]);
 
-  const loadRawPreview = async () => {
+  const loadDataAndHeaders = async () => {
     const file = files[0];
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -63,16 +64,32 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[selectedSheet];
         if (worksheet) {
-          // Get raw rows including headers to show user context
+          // Get raw rows for preview (starting from 0 to show context)
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: 0, 
             defval: "" 
-          });
-          setRawPreview(raw.slice(0, 30)); // Show more rows to handle high header indices
+          }) as any[][];
+          setRawPreview(raw.slice(0, 30));
+
+          // Extract headers specifically from the selected startRow
+          const headerJson = XLSX.utils.sheet_to_json(worksheet, { 
+            header: 1, 
+            range: startRow, 
+            defval: "" 
+          }) as any[][];
+          
+          if (headerJson.length > 0) {
+            const extractedHeaders = (headerJson[0] || [])
+              .map(h => String(h).trim())
+              .filter(h => h !== "");
+            setAvailableHeaders(extractedHeaders);
+          } else {
+            setAvailableHeaders([]);
+          }
         }
       } catch (err) {
-        console.error("Preview error", err);
+        console.error("Data loading error", err);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -94,18 +111,16 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
           }
         }
       } catch (err) {
-        console.error("Error parsing file", err);
+        console.error("Error parsing file metadata", err);
       }
     }
   };
 
   const autoMap = async () => {
-    if (!selectedDef || sheetMetadata.length === 0) return;
-    const currentSheet = sheetMetadata.find(s => s.name === selectedSheet);
-    if (!currentSheet) return;
+    if (!selectedDef || availableHeaders.length === 0) return;
     
     setIsProcessing(true);
-    const suggestions = await suggestMappings(selectedDef.fields, currentSheet.headers);
+    const suggestions = await suggestMappings(selectedDef.fields, availableHeaders);
     setMapping(suggestions);
     setIsProcessing(false);
   };
@@ -335,10 +350,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                       }`}
                     >
                       {showSkippedRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      {language === 'zh-CN' ? (showSkippedRows ? '隐藏顶部行' : '显示顶部行') : (showSkippedRows ? 'Hide Skipped' : 'Show Skipped')}
+                      {language === 'zh-CN' ? (showSkippedRows ? '显示顶部行' : '隐藏顶部行') : (showSkippedRows ? 'Show Skipped' : 'Hide Skipped')}
                     </button>
                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">
-                      {language === 'zh-CN' ? '文件: ' : 'File: '} {files[0].name}
+                      {language === 'zh-CN' ? '文件: ' : 'File: '} {files[0]?.name}
                     </span>
                   </div>
                 </div>
@@ -356,19 +371,20 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
+                      <tbody className="divide-y divide-slate-100 font-medium transition-all">
                         {/* Compression logic: If not showSkippedRows and startRow > 0, show a summary row */}
                         {!showSkippedRows && startRow > 0 && (
                           <tr className="bg-slate-50/30 group">
                             <td 
-                              colSpan={rawPreview[0]?.length + 1 || 20} 
-                              className="px-6 py-4 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
+                              colSpan={(rawPreview[0]?.length || 0) + 1} 
+                              className="px-6 py-6 text-center text-slate-400 italic cursor-pointer hover:bg-slate-100 transition-colors"
                               onClick={() => setShowSkippedRows(true)}
                             >
-                              <div className="flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-[10px]">
-                                <ChevronDown className="w-3 h-3" />
-                                {language === 'zh-CN' ? `已收起上方 ${startRow} 行配置外数据` : `${startRow} leading rows compressed`}
-                                <ChevronDown className="w-3 h-3" />
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                <ChevronDown className="w-5 h-5 animate-bounce" />
+                                <span className="font-black uppercase tracking-widest text-[10px]">
+                                  {language === 'zh-CN' ? `已收起上方 ${startRow} 行配置外数据 (点击展开查看详情)` : `${startRow} leading rows compressed (click to expand)`}
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -378,11 +394,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                           const isHeader = rIdx === startRow;
                           const isSkipped = rIdx < startRow;
                           
-                          // Skip rendering if collapsed
+                          // Hide rows if they are before startRow and we aren't showing skipped rows
                           if (isSkipped && !showSkippedRows) return null;
 
                           return (
-                            <tr key={rIdx} className={`transition-all duration-300 ${isHeader ? 'bg-indigo-50/50' : isSkipped ? 'opacity-40 grayscale' : 'hover:bg-slate-50'}`}>
+                            <tr key={rIdx} className={`transition-all duration-300 ${isHeader ? 'bg-indigo-50/50' : isSkipped ? 'opacity-40 grayscale bg-slate-50/30' : 'hover:bg-slate-50'}`}>
                               <td className={`px-4 py-3 text-center border-r border-slate-100 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-400'}`}>
                                 {rIdx}
                                 {isHeader && <div className="text-[8px] uppercase tracking-tighter text-indigo-400 mt-0.5">Header</div>}
@@ -411,7 +427,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                       <Info className="w-3.5 h-3.5" />
                       {language === 'zh-CN' ? '预览中深蓝色高亮的行为提取的表头' : 'Darker rows highlight the selected header row.'}
                     </p>
-                    {startRow > 5 && !showSkippedRows && (
+                    {startRow > 0 && !showSkippedRows && (
                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.15em] italic">
                         {language === 'zh-CN' ? '顶部冗余行已自动折叠以聚焦关键数据' : 'Leading rows automatically collapsed for focus.'}
                       </p>
@@ -429,12 +445,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-3xl font-black text-slate-800">{t.mappingTitle}</h2>
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '字段映射架构' : t.mappingTitle}</h2>
               <p className="text-slate-500 font-medium">{t.mappingSubtitle}</p>
             </div>
             <button 
               onClick={autoMap}
-              disabled={isProcessing}
+              disabled={isProcessing || availableHeaders.length === 0}
               className="bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-3.5 rounded-2xl font-black flex items-center gap-3 transition-all disabled:opacity-50 shadow-sm"
             >
               {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
@@ -472,10 +488,16 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
                         className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 bg-white shadow-sm appearance-none outline-none font-bold text-slate-700 transition-all"
                       >
                         <option value="">{t.unmapped}</option>
-                        {sheetMetadata.find(s => s.name === selectedSheet)?.headers.map(h => (
+                        {availableHeaders.map(h => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
+                      {availableHeaders.length === 0 && (
+                        <p className="text-[10px] text-red-400 mt-2 font-black uppercase flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {language === 'zh-CN' ? '未找到列名，请返回确认表头索引' : 'No headers found, check header index.'}
+                        </p>
+                      )}
                     </td>
                     <td className="px-10 py-8 text-center">
                       {field.required ? (
@@ -503,7 +525,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[28px] font-black flex items-center gap-4 shadow-2xl shadow-indigo-200 transition-all transform hover:-translate-y-2 active:translate-y-0"
             >
               {isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
-              {t.execute}
+              {language === 'zh-CN' ? '执行标准清洗' : t.execute}
             </button>
           </div>
         </div>
@@ -538,7 +560,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
             <div className="xl:col-span-4 space-y-6">
-              <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
                 <AlertCircle className="w-6 h-6 text-red-500" />
                 {t.exceptionsTitle}
               </h3>
@@ -575,7 +597,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({ definitions, language
             </div>
 
             <div className="xl:col-span-8 space-y-6">
-              <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                 {t.previewTitle}
               </h3>
