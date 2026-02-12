@@ -52,6 +52,7 @@ export interface TransformationTemplate {
   sheetName: string;
   startRow: number;
   mapping: Mapping;
+  expectedHeaders: string[]; // Added to allow validation without re-uploading file
   exportFileName: string;
   exportSheetName: string;
   updatedAt: string;

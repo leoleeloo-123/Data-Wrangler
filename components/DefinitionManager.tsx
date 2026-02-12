@@ -12,7 +12,8 @@ import {
   Type as TypeIcon,
   Calendar,
   ToggleLeft,
-  Database
+  Database,
+  Edit
 } from 'lucide-react';
 import { DataDefinition, FieldDefinition, FieldType } from '../types';
 import { translations } from '../translations';
@@ -112,7 +113,7 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
-                <span className="text-xs font-semibold text-slate-400">{def.fields.length} {t.fields}</span>
+                <span className="text-xs font-semibold text-slate-400">{def.fields.length} {language === 'zh-CN' ? '个字段' : 'Fields'}</span>
                 <span className="text-xs text-slate-400 italic">{t.created} {new Date(def.createdAt).toLocaleDateString()}</span>
               </div>
             </div>

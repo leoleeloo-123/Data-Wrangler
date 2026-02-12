@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
   FileSpreadsheet, 
   ArrowRight, 
+  Edit2,
   Settings2, 
   CheckCircle2, 
   AlertCircle, 
@@ -24,7 +25,11 @@ import {
   Bookmark,
   ClipboardCheck,
   Map,
-  FileText
+  FileText,
+  Files,
+  FolderOpen,
+  Check,
+  ChevronLeft
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -33,6 +38,13 @@ import { translations } from '../translations';
 
 // Excel utility provided globally in index.html
 declare const XLSX: any;
+
+interface FileValidationResult {
+  fileName: string;
+  isValid: boolean;
+  error?: string;
+  file: File;
+}
 
 interface TransformWizardProps {
   definitions: DataDefinition[];
@@ -52,7 +64,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const t = translations[language].transform;
   const [step, setStep] = useState(1);
   const [selectedDef, setSelectedDef] = useState<DataDefinition | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
+  const [activeTemplate, setActiveTemplate] = useState<TransformationTemplate | null>(null);
+  
+  // File states
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [batchFiles, setBatchFiles] = useState<FileValidationResult[]>([]);
+  
   const [sheetMetadata, setSheetMetadata] = useState<ExcelSheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [startRow, setStartRow] = useState<number>(0);
@@ -65,7 +82,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const [availableHeaders, setAvailableHeaders] = useState<string[]>([]);
   const [showSkippedRows, setShowSkippedRows] = useState(false);
 
-  // Export Modal State
+  // Export States
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileName, setExportFileName] = useState('Standardized_Tax_Data');
   const [exportSheetName, setExportSheetName] = useState('StandardizedData');
@@ -73,16 +90,17 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   // Template State
   const [newTemplateName, setNewTemplateName] = useState('');
 
-  // Sync state between steps
-  useEffect(() => {
-    if (files.length > 0 && selectedSheet) {
-      loadDataAndHeaders();
-    }
-  }, [files, selectedSheet, startRow]);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const loadDataAndHeaders = async () => {
-    const file = files[0];
-    if (!file) return;
+  // Sync state for template preview
+  useEffect(() => {
+    if (templateFile && selectedSheet) {
+      loadTemplatePreview();
+    }
+  }, [templateFile, selectedSheet, startRow]);
+
+  const loadTemplatePreview = async () => {
+    if (!templateFile) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -114,27 +132,23 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
           }
         }
       } catch (err) {
-        console.error("Data preview loading error", err);
+        console.error("Template preview loading error", err);
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(templateFile);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const fileList = e.target.files;
-      const selectedFiles = Array.from(fileList);
-      setFiles(selectedFiles);
+      const file = e.target.files[0];
+      setTemplateFile(file);
       
-      const firstFile = fileList[0];
       try {
-        if (firstFile) {
-          const metadata = await parseExcelMetadata(firstFile);
-          setSheetMetadata(metadata);
-          if (metadata.length > 0 && !selectedSheet) {
-            setSelectedSheet(metadata[0].name);
-            setExportSheetName(metadata[0].name + '_Standardized');
-          }
+        const metadata = await parseExcelMetadata(file);
+        setSheetMetadata(metadata);
+        if (metadata.length > 0) {
+          setSelectedSheet(metadata[0].name);
+          setExportSheetName(metadata[0].name + '_Standardized');
         }
       } catch (err) {
         console.error("Error parsing file metadata", err);
@@ -142,13 +156,95 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     }
   };
 
+  const validateFileSchema = async (file: File): Promise<FileValidationResult> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[selectedSheet];
+          
+          if (!worksheet) {
+            return resolve({
+              fileName: file.name,
+              isValid: false,
+              error: language === 'zh-CN' ? `找不到工作表 "${selectedSheet}"` : `Sheet "${selectedSheet}" not found.`,
+              file
+            });
+          }
+
+          const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
+            header: 1, 
+            range: Number(startRow), 
+            defval: "" 
+          }) as any[][];
+
+          const fileHeaders = (headerRows[0] || [])
+            .map(h => String(h).trim())
+            .filter(h => h !== "");
+
+          // Check if all template headers exist in this file
+          const missing = availableHeaders.filter(h => !fileHeaders.includes(h));
+          
+          if (missing.length > 0) {
+            return resolve({
+              fileName: file.name,
+              isValid: false,
+              error: language === 'zh-CN' ? `缺少列: ${missing.join(', ')}` : `Missing columns: ${missing.join(', ')}`,
+              file
+            });
+          }
+
+          resolve({ fileName: file.name, isValid: true, file });
+        } catch (err) {
+          resolve({
+            fileName: file.name,
+            isValid: false,
+            error: language === 'zh-CN' ? "读取文件失败。" : "Failed to read file.",
+            file
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleBatchFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setIsProcessing(true);
+      const newFiles = Array.from(e.target.files) as File[];
+      const results: FileValidationResult[] = [];
+      
+      for (const file of newFiles) {
+        const res = await validateFileSchema(file);
+        results.push(res);
+      }
+      
+      setBatchFiles(prev => [...prev, ...results]);
+      setIsProcessing(false);
+    }
+  };
+
+  const removeBatchFile = (index: number) => {
+    setBatchFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const applyTemplate = (tpl: TransformationTemplate) => {
+    const def = definitions.find(d => d.id === tpl.definitionId);
+    if (!def) return;
+
+    setSelectedDef(def);
+    setActiveTemplate(tpl);
     setSelectedSheet(tpl.sheetName);
     setStartRow(tpl.startRow);
     setMapping(tpl.mapping);
+    setAvailableHeaders(tpl.expectedHeaders || []);
     setExportFileName(tpl.exportFileName);
     setExportSheetName(tpl.exportSheetName);
-    setStep(2); // Jump to upload with loaded settings
+    
+    // Skip Step 2 & 3, go straight to Batch Upload
+    setStep(4); 
   };
 
   const handleSaveTemplate = () => {
@@ -160,16 +256,27 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       sheetName: selectedSheet,
       startRow,
       mapping,
+      expectedHeaders: availableHeaders,
       exportFileName,
       exportSheetName,
       updatedAt: new Date().toISOString()
     };
     onSaveTemplate(template);
     setNewTemplateName('');
+    resetState();
     setStep(1);
+    alert(t.templateSaved);
+  };
+
+  const resetState = () => {
     setResults(null);
     setSelectedDef(null);
-    alert(t.templateSaved);
+    setActiveTemplate(null);
+    setTemplateFile(null);
+    setBatchFiles([]);
+    setRawPreview([]);
+    setAvailableHeaders([]);
+    setMapping({});
   };
 
   const autoMap = async () => {
@@ -190,16 +297,18 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   };
 
   const runTransformation = async () => {
-    if (!selectedDef || !selectedSheet) return;
+    if (!selectedDef || !selectedSheet || batchFiles.length === 0) return;
     setIsProcessing(true);
     setResults(null);
+    
+    const validFiles = batchFiles.filter(f => f.isValid).map(f => f.file);
     
     try {
       const allRows: any[] = [];
       const allErrors: ValidationError[] = [];
 
-      for (let i = 0; i < files.length; i++) {
-        const data = await extractSheetData(files[i], selectedSheet, Number(startRow));
+      for (const file of validFiles) {
+        const data = await extractSheetData(file, selectedSheet, Number(startRow));
         
         data.forEach((rawRow, rowIdx) => {
           const processedRow: any = {};
@@ -215,7 +324,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 row: rowIdx + (Number(startRow) + 2),
                 field: field.name,
                 value: rawValue,
-                message: `Required field missing in file ${files[i].name}`,
+                message: `Required field missing in file ${file.name}`,
                 severity: 'error'
               });
             }
@@ -227,7 +336,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                   row: rowIdx + (Number(startRow) + 2),
                   field: field.name,
                   value: rawValue,
-                  message: `Non-numeric value in numeric field in file ${files[i].name}`,
+                  message: `Non-numeric value in numeric field in file ${file.name}`,
                   severity: 'error'
                 });
               } else {
@@ -243,7 +352,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       }
 
       setResults({ rows: allRows, errors: allErrors });
-      setStep(4);
+      setStep(5); // Jump to Results
     } catch (err) {
       console.error("Transformation Error", err);
       alert(language === 'zh-CN' ? '转换过程中发生错误' : 'An error occurred during transformation');
@@ -270,11 +379,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
   const steps = [
     { num: 1, label: language === 'zh-CN' ? '选择定义' : 'Choose Definition' },
-    { num: 2, label: language === 'zh-CN' ? '上传配置' : 'Upload & Config' },
-    { num: 3, label: language === 'zh-CN' ? '映射列名' : 'Map Columns' },
-    { num: 4, label: language === 'zh-CN' ? '转换结果' : 'Results' },
-    { num: 5, label: language === 'zh-CN' ? '保存逻辑' : 'Save Logic' }
+    { num: 2, label: language === 'zh-CN' ? '解析模板' : 'Parsing Template' },
+    { num: 3, label: language === 'zh-CN' ? '映射字段' : 'Map Fields' },
+    { num: 4, label: language === 'zh-CN' ? '上传源文件' : 'Upload Sources' },
+    { num: 5, label: language === 'zh-CN' ? '转换结果' : 'Results' },
+    { num: 6, label: language === 'zh-CN' ? '保存逻辑' : 'Save Logic' }
   ];
+
+  const allBatchFilesValid = batchFiles.length > 0 && batchFiles.every(f => f.isValid);
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto pb-24 h-full relative">
@@ -290,7 +402,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             <span className={`text-sm font-bold hidden lg:inline ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'}`}>
               {s.label}
             </span>
-            {s.num < 5 && <div className="h-[1px] bg-slate-100 flex-1 mx-4 hidden lg:block" />}
+            {s.num < 6 && <div className="h-[1px] bg-slate-100 flex-1 mx-4 hidden lg:block" />}
           </div>
         ))}
       </div>
@@ -344,7 +456,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Start Fresh Option */}
                 <button 
                   onClick={() => setStep(2)}
                   className="group bg-white p-10 rounded-[40px] border-2 border-dashed border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/30 transition-all text-center space-y-4"
@@ -353,10 +464,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     <ArrowRight className="w-8 h-8 text-slate-400 group-hover:text-white transition-colors" />
                   </div>
                   <h4 className="text-xl font-black text-slate-800 tracking-tight">{t.startFresh}</h4>
-                  <p className="text-slate-400 font-medium">Configure parsing logic from scratch for new file structures.</p>
+                  <p className="text-slate-400 font-medium">{language === 'zh-CN' ? '从头开始配置新文件结构的解析逻辑。' : 'Configure parsing logic from scratch for new file structures.'}</p>
                 </button>
 
-                {/* Templates Section */}
                 <div className="space-y-6">
                   <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                     <Bookmark className="w-5 h-5 text-amber-500" />
@@ -395,46 +505,48 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         </div>
       )}
 
-      {/* Step 2: Upload & Config */}
+      {/* Step 2: Confirm Template */}
       {step === 2 && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
-          <div className="bg-white border-2 border-dashed border-slate-200 rounded-[40px] p-12 text-center transition-all hover:border-indigo-300 relative group">
-            <input 
-              type="file" 
-              multiple 
-              onChange={handleFileChange}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-            />
-            <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Upload className="w-10 h-10 text-indigo-600" />
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.uploadTitle}</h3>
-            <p className="text-slate-500 mt-2 font-medium">{t.uploadSubtitle}</p>
-            {files.length > 0 && (
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                {files.map((f, i) => (
-                  <span key={i} className="bg-indigo-50 text-indigo-700 text-xs px-4 py-2 rounded-xl flex items-center gap-2 font-bold shadow-sm border border-indigo-100 animate-in fade-in zoom-in-95">
-                    <FileSpreadsheet className="w-4 h-4" />
-                    {f.name}
-                    <X className="w-3 h-3 ml-1 cursor-pointer hover:text-red-500" onClick={(e) => {
-                      e.stopPropagation();
-                      setFiles(prev => prev.filter((_, idx) => idx !== i));
-                    }} />
-                  </span>
-                ))}
+          <div className={`bg-white border-2 border-dashed border-slate-200 rounded-[40px] p-12 text-center transition-all hover:border-indigo-300 relative group ${templateFile ? 'border-emerald-200 bg-emerald-50/10' : ''}`}>
+            {!templateFile ? (
+              <>
+                <input 
+                  type="file" 
+                  onChange={handleTemplateFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  accept=".xlsx, .xls"
+                />
+                <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Upload className="w-10 h-10 text-indigo-600" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.uploadTitle}</h3>
+                <p className="text-slate-500 mt-2 font-medium">{t.uploadSubtitle}</p>
+              </>
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">{templateFile.name}</h3>
+                <p className="text-emerald-600 font-bold mt-1 uppercase tracking-widest text-xs">Template File Confirmed</p>
+                <button 
+                  onClick={() => { setTemplateFile(null); setRawPreview([]); }}
+                  className="mt-6 text-slate-400 hover:text-red-500 font-black text-xs uppercase tracking-widest flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" /> Change Template
+                </button>
               </div>
             )}
           </div>
 
-          {files.length > 0 && (
+          {templateFile && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-4 bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8 h-fit sticky top-32">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                    <Settings2 className="w-6 h-6 text-indigo-600" />
-                    {t.configTitle}
-                  </h3>
-                </div>
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                  <Settings2 className="w-6 h-6 text-indigo-600" />
+                  {t.configTitle}
+                </h3>
                 
                 <div className="space-y-8">
                   <div className="space-y-3">
@@ -469,7 +581,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     onClick={() => setStep(3)}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-[28px] font-black flex items-center justify-center gap-3 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-1"
                   >
-                    {language === 'zh-CN' ? '继续映射' : 'Proceed to Mapping'}
+                    {t.continueMapping}
                     <ArrowRight className="w-6 h-6" />
                   </button>
                 </div>
@@ -566,7 +678,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="px-10 py-6 text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '目标标准化字段' : 'Target Standard Field'}</th>
-                  <th className="px-10 py-6 text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '源文件对应列' : 'Source Column Reference'}</th>
+                  <th className="px-10 py-6 text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '源模板对应列' : 'Template Column Reference'}</th>
                   <th className="px-10 py-6 text-xs font-black text-slate-400 uppercase tracking-widest text-center">{language === 'zh-CN' ? '约束' : 'Constraint'}</th>
                 </tr>
               </thead>
@@ -614,22 +726,198 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               onClick={() => setStep(2)}
               className="text-slate-400 hover:text-slate-800 font-black px-6 py-3 transition-colors uppercase tracking-widest text-sm flex items-center gap-2"
             >
-              &larr; {language === 'zh-CN' ? '返回配置' : 'Back to Config'}
+              &larr; {language === 'zh-CN' ? '返回模板' : 'Back to Template'}
             </button>
             <button 
-              onClick={runTransformation}
-              disabled={isProcessing}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[28px] font-black flex items-center gap-4 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:translate-y-0"
+              onClick={() => setStep(4)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[28px] font-black flex items-center gap-4 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2"
             >
-              {isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
-              {language === 'zh-CN' ? '执行标准清洗' : t.execute}
+              {t.uploadSources}
+              <ArrowRight className="w-6 h-6" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 4: Results */}
-      {step === 4 && results && (
+      {/* Step 4: Batch Upload & Validation */}
+      {step === 4 && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.batchTitle}</h2>
+            <p className="text-slate-500 mt-2 font-medium">{t.batchSubtitle}</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-[40px] p-16 text-center transition-all hover:border-indigo-300 relative group min-h-[400px] flex flex-col items-center justify-center">
+                <input 
+                  type="file" 
+                  multiple 
+                  onChange={handleBatchFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  accept=".xlsx, .xls"
+                />
+                <div className="bg-indigo-50 w-24 h-24 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
+                  <Files className="w-12 h-12 text-indigo-600" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.batchUpload}</h3>
+                
+                <div className="mt-8 flex gap-4">
+                  <button 
+                    onClick={() => folderInputRef.current?.click()}
+                    className="bg-white border border-slate-200 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-50 flex items-center gap-2 transition-all"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    Select Folder
+                  </button>
+                  <input 
+                    type="file" 
+                    webkitdirectory="" 
+                    directory="" 
+                    multiple 
+                    ref={folderInputRef}
+                    className="hidden" 
+                    onChange={handleBatchFileChange}
+                  />
+                </div>
+              </div>
+
+              {batchFiles.length > 0 && (
+                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                      <Files className="w-4 h-4 text-indigo-500" />
+                      {t.validationTitle}
+                    </h3>
+                    <span className="text-[10px] font-black text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">
+                      {batchFiles.length} {batchFiles.length === 1 ? 'file' : 'files'}
+                    </span>
+                  </div>
+                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                    {batchFiles.map((res, i) => (
+                      <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50/30 transition-colors group">
+                        <div className="flex items-center gap-6 overflow-hidden">
+                          <div className={`p-3 rounded-2xl ${res.isValid ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                            {res.isValid ? <Check className="w-5 h-5 text-emerald-600" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className={`font-black truncate ${res.isValid ? 'text-slate-800' : 'text-red-900'}`}>{res.fileName}</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${res.isValid ? 'text-emerald-500' : 'text-red-400'}`}>
+                              {res.isValid ? t.validationSuccess : res.error}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => removeBatchFile(i)}
+                          className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-4 space-y-8">
+              <div className={`bg-white p-10 rounded-[40px] border shadow-2xl transition-all ${
+                batchFiles.length === 0 ? 'border-slate-100 opacity-60' : 
+                allBatchFilesValid ? 'border-emerald-200 bg-emerald-50/20' : 'border-amber-100 bg-amber-50/20'
+              }`}>
+                {batchFiles.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Info className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold text-sm">{t.noFiles}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-4 rounded-3xl ${allBatchFilesValid ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                        {allBatchFilesValid ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-black text-slate-800 tracking-tight">
+                          {allBatchFilesValid ? (language === 'zh-CN' ? '准备就绪' : 'Ready to Process') : (language === 'zh-CN' ? '需要注意' : 'Attention Required')}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {allBatchFilesValid ? t.allValid : t.someInvalid}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest">
+                        <span className="text-slate-400">{language === 'zh-CN' ? '总文件数' : 'Total Files'}</span>
+                        <span className="text-slate-800">{batchFiles.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest">
+                        <span className="text-emerald-400">{language === 'zh-CN' ? '通过' : 'Valid'}</span>
+                        <span className="text-emerald-600">{batchFiles.filter(f => f.isValid).length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest">
+                        <span className="text-red-400">{language === 'zh-CN' ? '未通过' : 'Invalid'}</span>
+                        <span className="text-red-600">{batchFiles.filter(f => !f.isValid).length}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={runTransformation}
+                      disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid)}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-6 rounded-[32px] font-black flex items-center justify-center gap-4 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 disabled:opacity-50 disabled:transform-none"
+                    >
+                      {isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
+                      {t.execute}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Parsing Logic Summary Box */}
+              <div className="bg-white p-8 rounded-[40px] border border-slate-100 space-y-6">
+                 <div className="flex items-center gap-4">
+                    <div className="bg-indigo-50 p-3 rounded-2xl">
+                       <LayoutIcon className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <div>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '当前解析逻辑' : 'Active Parsing Logic'}</p>
+                       <p className="font-bold text-slate-800 truncate max-w-[150px]">
+                        {activeTemplate ? activeTemplate.name : (templateFile ? templateFile.name : (language === 'zh-CN' ? '自定义配置' : 'Custom Config'))}
+                       </p>
+                    </div>
+                 </div>
+                 
+                 <div className="flex gap-2">
+                    <button 
+                      onClick={() => setStep(2)}
+                      className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-500 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                      {language === 'zh-CN' ? '修改解析' : 'Modify Parsing'}
+                    </button>
+                    <button 
+                      onClick={() => setStep(3)}
+                      className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-500 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      <Map className="w-4 h-4" />
+                      {language === 'zh-CN' ? '修改映射' : 'Modify Mapping'}
+                    </button>
+                 </div>
+              </div>
+              
+              <button 
+                onClick={() => { resetState(); setStep(1); }}
+                className="w-full text-slate-400 hover:text-slate-600 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 py-4"
+              >
+                <ChevronLeft className="w-4 h-4" /> {language === 'zh-CN' ? '返回首页' : 'Return to Home'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Results */}
+      {step === 5 && results && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 h-full">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
@@ -732,13 +1020,13 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
           <div className="flex justify-between pt-8">
             <button 
-              onClick={() => { setStep(1); setResults(null); setSelectedDef(null); }}
+              onClick={() => { setStep(1); resetState(); }}
               className="px-10 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-[28px] font-black hover:border-indigo-300 hover:text-indigo-600 transition-all transform hover:-translate-y-1"
             >
               {t.initNew}
             </button>
             <button 
-              onClick={() => setStep(5)}
+              onClick={() => setStep(6)}
               className="px-10 py-4 bg-indigo-600 text-white rounded-[28px] font-black hover:bg-indigo-700 transition-all transform hover:-translate-y-1 flex items-center gap-3 shadow-xl"
             >
               {t.gotoSave}
@@ -748,16 +1036,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         </div>
       )}
 
-      {/* Step 5: Review & Save Template */}
-      {step === 5 && selectedDef && (
+      {/* Step 6: Review & Save Template */}
+      {step === 6 && selectedDef && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10 max-w-5xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-black text-slate-800 tracking-tight">{t.reviewTitle}</h2>
-            <p className="text-slate-500 mt-2 font-bold text-lg">{t.reviewSubtitle}</p>
+            <p className="text-slate-500 mt-2 font-black text-lg">{t.reviewSubtitle}</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Target Module Summary */}
             <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <Database className="w-4 h-4 text-indigo-500" />
@@ -769,7 +1056,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
             </div>
 
-            {/* Source Configuration Summary */}
             <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <FileText className="w-4 h-4 text-emerald-500" />
@@ -777,17 +1063,16 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sheet Name</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Template Sheet</p>
                   <p className="font-bold text-slate-800">{selectedSheet}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Header Row Index</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Header Row</p>
                   <p className="font-bold text-slate-800">{startRow}</p>
                 </div>
               </div>
             </div>
 
-            {/* Field Mapping Summary */}
             <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4 lg:col-span-2">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <Map className="w-4 h-4 text-amber-500" />
@@ -808,7 +1093,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
             </div>
 
-            {/* Export Defaults Summary */}
             <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4 lg:col-span-2">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <ClipboardCheck className="w-4 h-4 text-indigo-500" />
@@ -856,7 +1140,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             
             <div className="flex gap-4 pt-4">
                <button 
-                onClick={() => setStep(4)}
+                onClick={() => setStep(5)}
                 className="flex-1 px-10 py-5 border-2 border-white/10 text-white font-black rounded-[32px] hover:bg-white/10 transition-all uppercase tracking-widest text-xs"
               >
                 &larr; Back to Results
@@ -874,7 +1158,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         </div>
       )}
 
-      {/* Export Settings Modal - Only triggered from Results step */}
+      {/* Export Settings Modal */}
       {isExportModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300 backdrop-blur-md bg-slate-900/60">
           <div className="bg-white w-full max-w-lg rounded-[48px] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
