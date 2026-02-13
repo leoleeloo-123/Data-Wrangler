@@ -52,21 +52,19 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
   };
 
   return (
-    <div className="px-8 py-10 max-w-[1800px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-5xl font-black text-slate-800 tracking-tighter">{t.sidebar.review}</h1>
-          <p className="text-slate-500 font-bold mt-2 text-lg">
-            {language === 'zh-CN' ? '查看并审计已导出的批处理结果快照。' : 'Review and audit exported snapshots of batch transformation results.'}
-          </p>
-        </div>
+    <div className="px-12 py-12 max-w-[1800px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4">
+      <header className="space-y-2">
+        <h1 className="text-6xl font-black text-slate-800 tracking-tighter">{t.sidebar.review}</h1>
+        <p className="text-slate-400 font-bold text-xl">
+          {language === 'zh-CN' ? '查看并审计已导出的批处理结果快照。' : 'Review and audit exported snapshots of batch transformation results.'}
+        </p>
       </header>
 
       {!selectedEntry ? (
         <div className="grid grid-cols-1 gap-5">
           {entries.length > 0 ? (
             entries.map((entry) => (
-              <div key={entry.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group relative overflow-hidden">
+              <div key={entry.id} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 text-slate-50 group-hover:text-indigo-50/50 transition-colors pointer-events-none">
                   <ClipboardCheck className="w-32 h-32" />
                 </div>
@@ -127,9 +125,8 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
               </div>
             ))
           ) : (
-            <div className="py-32 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50 space-y-4">
-              <ClipboardCheck className="w-16 h-16 text-slate-200 mx-auto opacity-30" />
-              <p className="text-slate-400 font-black text-lg uppercase tracking-widest">
+            <div className="py-64 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50 flex items-center justify-center">
+              <p className="text-slate-400 font-black text-2xl uppercase tracking-widest opacity-60">
                 {language === 'zh-CN' ? '尚无 Review 记录。' : 'No Data Review records.'}
               </p>
             </div>

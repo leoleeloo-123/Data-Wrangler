@@ -7,7 +7,7 @@ import {
   FileUp, 
   ChevronRight, 
   Database,
-  Building2,
+  FileBarChart,
   Layers,
   ClipboardCheck
 } from 'lucide-react';
@@ -33,16 +33,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
-        <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-lg">
-            <Building2 className="w-6 h-6 text-white" />
+      {/* Sidebar - Widened slightly to accommodate larger font */}
+      <aside className="w-80 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
+        <div className="p-8 border-b border-slate-100 flex items-center gap-4">
+          <div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-100">
+            <FileBarChart className="w-8 h-8 text-white" />
           </div>
-          <span className="font-bold text-xl tracking-tight text-slate-800">TaxStandard</span>
+          <span className="font-black text-3xl tracking-tighter text-slate-800">TaxStandard</span>
         </div>
         
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-6 space-y-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -50,27 +50,27 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 ${
+                className={`w-full flex items-center gap-5 px-6 py-5 rounded-2xl transition-all duration-300 ${
                   isActive 
-                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-bold' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'
+                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-black' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-bold'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                <span className="text-base">{item.label}</span>
-                {isActive && <ChevronRight className="w-4 h-4 ml-auto opacity-50" />}
+                <Icon className={`w-7 h-7 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <span className="text-xl">{item.label}</span>
+                {isActive && <ChevronRight className="w-5 h-5 ml-auto opacity-50" />}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-slate-100">
+        <div className="p-6 mt-auto border-t border-slate-100">
           <button 
             onClick={onOpenConfig}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors font-medium"
+            className="w-full flex items-center gap-5 px-6 py-5 rounded-2xl text-slate-500 hover:bg-slate-50 transition-colors font-bold"
           >
-            <Settings className="w-5 h-5 text-slate-400" />
-            <span className="text-base">{t.sidebar.config}</span>
+            <Settings className="w-7 h-7 text-slate-400" />
+            <span className="text-xl">{t.sidebar.config}</span>
           </button>
         </div>
       </aside>
