@@ -421,7 +421,7 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-10">
-                {/* Configuration Management Card matching screenshot */}
+                {/* Configuration Management Card */}
                 <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-sm space-y-8 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-10 text-slate-50 group-hover:text-indigo-50 transition-colors">
                      <Share2 className="w-32 h-32" />
@@ -446,7 +446,6 @@ const App: React.FC = () => {
                         <UploadIcon className="w-6 h-6" />
                         {t.dashboard.importBtn}
                       </button>
-                      {/* New Clear Config Button */}
                       <button 
                         onClick={clearAllConfiguration}
                         className="bg-white border-2 border-red-100 hover:border-red-600 hover:bg-red-50 text-red-400 hover:text-red-600 font-black px-8 py-5 rounded-2xl transition-all flex items-center gap-3 transform hover:-translate-y-1 active:scale-95 shadow-sm ml-auto"
@@ -486,7 +485,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sidebar Quick Actions and Governance matched with screenshot */}
+              {/* Sidebar Quick Actions */}
               <div className="lg:col-span-4 space-y-10">
                 <div className="space-y-6">
                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.dashboard.quickActions}</h3>
@@ -497,7 +496,6 @@ const App: React.FC = () => {
                     >
                       <PlusCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
                       {t.dashboard.newBatch}
-                      <div className="h-0.5 flex-1 bg-white/20 mx-4 rounded-full" />
                     </button>
                     <button 
                       onClick={() => setActiveTab('review')}
@@ -507,22 +505,6 @@ const App: React.FC = () => {
                       {t.sidebar.review}
                     </button>
                   </div>
-                </div>
-
-                <div className="bg-indigo-900 p-10 rounded-2xl text-white shadow-xl shadow-indigo-100 relative overflow-hidden group min-h-[280px] flex flex-col justify-between">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-125 transition-transform duration-1000" />
-                  <div className="relative z-10 space-y-6">
-                    <h4 className="font-black text-xl flex items-center gap-3 uppercase tracking-widest text-indigo-200">
-                      <Info className="w-6 h-6 text-indigo-400" />
-                      {t.dashboard.governanceTip}
-                    </h4>
-                    <p className="text-base text-indigo-100 font-bold leading-relaxed opacity-80">
-                      {t.dashboard.governanceDesc}
-                    </p>
-                  </div>
-                  <button className="relative z-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-indigo-400 hover:text-white transition-colors pt-4 group">
-                    {t.dashboard.learnPolicy} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -702,7 +684,7 @@ const App: React.FC = () => {
                         onClick={() => selectedImportFile && handleImport(selectedImportFile, 'merge')}
                         className="flex flex-col items-start gap-3 p-6 border-2 border-slate-100 rounded-2xl hover:border-indigo-600 hover:bg-indigo-50 transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed group"
                       >
-                         <Layers className="w-8 h-8 text-indigo-600 group-hover:scale-105 transition-transform" />
+                         <Layers className="w-8 h-8 text-indigo-600" group-hover:scale-105 transition-transform" />
                          <div>
                             <p className="font-black text-slate-800">{t.dashboard.modeMerge}</p>
                             <p className="text-xs text-slate-400 font-medium mt-1">Smart upsert: Keep your local data and update matching IDs.</p>
