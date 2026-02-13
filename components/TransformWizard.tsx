@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -39,7 +39,7 @@ import {
   ListFilter
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
-import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
+import { parseExcelMetadata, extractSheetData, ExcelSheetInfo, getExcelColumnName } from '../services/excelService';
 import { suggestMappings } from '../services/geminiService';
 import { translations } from '../translations';
 
@@ -78,6 +78,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<FileValidationResult[]>([]);
   
+  // CACHE: Store the workbook object once loaded to prevent re-parsing during config refreshes
+  const cachedWorkbook = useRef<any>(null);
+
   const [sheetMetadata, setSheetMetadata] = useState<ExcelSheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [isSheetConfirmed, setIsSheetConfirmed] = useState(false);
@@ -88,7 +91,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const [endRow, setEndRow] = useState<number | ''>('');
   
   // Applied states (used for rendering the preview and mapping logic)
-  // These only update when the user clicks "Refresh Data Preview"
   const [appliedStartRow, setAppliedStartRow] = useState<number>(0);
   const [appliedEndRow, setAppliedEndRow] = useState<number | ''>('');
 
@@ -110,8 +112,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   // Template State
   const [newTemplateName, setNewTemplateName] = useState('');
 
-  const folderInputRef = useRef<HTMLInputElement>(null);
-
   // Initial load when sheet is confirmed
   useEffect(() => {
     if (templateFile && selectedSheet && isSheetConfirmed) {
@@ -123,22 +123,21 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     if (!templateFile || !selectedSheet) return;
 
     setIsProcessing(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    
+    const parseFromWorkbook = (wb: any) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const worksheet = workbook.Sheets[selectedSheet];
+        const worksheet = wb.Sheets[selectedSheet];
         if (worksheet) {
-          // Parse ONLY the target sheet content for preview
+          // OPTIMIZATION: Parse a limited range for preview to stay lightweight
+          const previewRange = { s: { c: 0, r: 0 }, e: { c: 52, r: Math.max(500, Number(startRow) + 200) } };
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
-            range: 0, 
+            range: previewRange, 
             defval: "" 
           }) as any[][];
-          setRawPreview(raw.slice(0, 100)); // Show a bit more for context
+          setRawPreview(raw.slice(0, 300));
 
-          // Parse specifically the header row for field mapping using the CURRENT input values
+          // Header detection uses the same logic as extractSheetData to support blank headers
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Math.max(0, Number(startRow)), 
@@ -146,38 +145,62 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
           }) as any[][];
           
           if (headerRows && headerRows.length > 0) {
-            const extractedHeaders = (headerRows[0] || [])
-              .map(h => String(h).trim())
-              .filter(h => h !== "");
-            setAvailableHeaders(extractedHeaders);
+            const headerRow = headerRows[0] || [];
+            // Find max columns to include columns with data but empty headers
+            const maxCols = Math.max(headerRow.length, ...headerRows.slice(1, 10).map(r => r.length));
+            
+            const finalHeaders: string[] = [];
+            for (let i = 0; i < maxCols; i++) {
+              const val = String(headerRow[i] || "").trim();
+              finalHeaders.push(val !== "" ? val : `Column ${getExcelColumnName(i)}`);
+            }
+            setAvailableHeaders(finalHeaders);
           } else {
             setAvailableHeaders([]);
           }
 
-          // Sync applied values only after successful parse
           setAppliedStartRow(startRow);
           setAppliedEndRow(endRow);
         }
       } catch (err) {
-        console.error("Template preview loading error", err);
+        console.error("Template preview parsing error", err);
         setRawPreview([]);
       } finally {
         setIsProcessing(false);
       }
     };
-    reader.readAsArrayBuffer(templateFile);
+
+    if (cachedWorkbook.current) {
+      // Use cached workbook if sheet is already loaded
+      parseFromWorkbook(cachedWorkbook.current);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          cachedWorkbook.current = workbook;
+          parseFromWorkbook(workbook);
+        } catch (err) {
+          console.error("Template file reading error", err);
+          setIsProcessing(false);
+        }
+      };
+      reader.readAsArrayBuffer(templateFile);
+    }
   };
 
   const handleTemplateFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setTemplateFile(file);
+      cachedWorkbook.current = null; // Clear cache for new file
       setIsSheetConfirmed(false);
       setRawPreview([]);
       setAvailableHeaders([]);
       
       try {
-        // Fast metadata extraction: only gets sheet names
+        // FAST: Metadata extraction only gets sheet names
         const metadata = await parseExcelMetadata(file);
         setSheetMetadata(metadata);
         if (metadata.length > 0) {
@@ -196,7 +219,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          // OPTIMIZATION: Only parse the required sheet in the workbook
+          const workbook = XLSX.read(data, { type: 'array', sheets: [selectedSheet] });
           const worksheet = workbook.Sheets[selectedSheet];
           
           if (!worksheet) {
@@ -208,18 +232,21 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             });
           }
 
-          // Schema validation only checks the targeted sheet in the workbook
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Math.max(0, Number(appliedStartRow)), 
             defval: "" 
           }) as any[][];
 
-          const fileHeaders = (headerRows[0] || [])
-            .map(h => String(h).trim())
-            .filter(h => h !== "");
+          const headerRow = headerRows[0] || [];
+          const maxCols = Math.max(headerRow.length, ...headerRows.slice(1, 10).map(r => r.length));
+          
+          const fileHeaders: string[] = [];
+          for (let i = 0; i < maxCols; i++) {
+            const val = String(headerRow[i] || "").trim();
+            fileHeaders.push(val !== "" ? val : `Column ${getExcelColumnName(i)}`);
+          }
 
-          // Check if all template headers exist in this specific sheet
           const missing = availableHeaders.filter(h => !fileHeaders.includes(h));
           
           if (missing.length > 0) {
@@ -339,6 +366,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setSelectedDef(null);
     setActiveTemplate(null);
     setTemplateFile(null);
+    cachedWorkbook.current = null;
     setBatchFiles([]);
     setRawPreview([]);
     setAvailableHeaders([]);
@@ -388,7 +416,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       });
 
       for (const file of validFiles) {
-        // extractSheetData ensures only the configured sheet is parsed
         const data = await extractSheetData(file, selectedSheet, Number(appliedStartRow), endRowLimit);
         
         data.forEach((rawRow, rowIdx) => {
@@ -722,7 +749,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                   <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-50"><CheckCircle2 className="w-8 h-8 text-emerald-600" /></div>
                   <h3 className="text-xl font-black text-slate-800 tracking-tight truncate max-w-full px-4">{templateFile.name}</h3>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">{language === 'zh-CN' ? '文件已就绪' : 'File Loaded'}</p>
-                  <button onClick={() => { setTemplateFile(null); setRawPreview([]); setIsSheetConfirmed(false); }} className="mt-8 bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"><Trash2 className="w-4 h-4" /> {language === 'zh-CN' ? '更改模板' : 'Change Template'}</button>
+                  <button onClick={() => { setTemplateFile(null); cachedWorkbook.current = null; setRawPreview([]); setIsSheetConfirmed(false); }} className="mt-8 bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"><Trash2 className="w-4 h-4" /> {language === 'zh-CN' ? '更改模板' : 'Change Template'}</button>
                 </div>
               )}
             </div>
@@ -857,7 +884,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                       <thead className="bg-slate-50 sticky top-0 z-20">
                         <tr>
                           <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 w-20 text-center">Row</th>
-                          {(rawPreview[appliedStartRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
+                          {(rawPreview[appliedStartRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {getExcelColumnName(i)}</th>)}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold transition-all">
