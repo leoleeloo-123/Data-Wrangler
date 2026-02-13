@@ -251,13 +251,16 @@ const App: React.FC = () => {
         );
       case 'history':
         return (
-          <div className="p-8 max-w-[1600px] mx-auto">
-            <h2 className="text-3xl font-black text-slate-800 mb-8">{t.sidebar.history}</h2>
-            <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">
+          <div className="p-12 max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4">
+            <header>
+              <h1 className="text-5xl font-black text-slate-800 tracking-tighter">{t.sidebar.history}</h1>
+              <p className="text-slate-500 font-bold mt-2 text-lg">Detailed logs of all standard cleansing and batch transformation activities.</p>
+            </header>
+            <div className="bg-white rounded-[48px] border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-32 text-center text-slate-400">
-                <Clock className="w-20 h-20 mx-auto mb-6 opacity-10" />
-                <p className="text-xl font-bold">No archival logs found.</p>
-                <p className="mt-2 font-medium">Completed transformation tasks will appear here.</p>
+                <Clock className="w-24 h-24 mx-auto mb-8 opacity-10" />
+                <p className="text-2xl font-black text-slate-300">No archival logs found.</p>
+                <p className="mt-4 font-bold text-slate-400">Completed transformation tasks and export history will appear here.</p>
               </div>
             </div>
           </div>
