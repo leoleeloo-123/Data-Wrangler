@@ -684,7 +684,7 @@ const App: React.FC = () => {
                         onClick={() => selectedImportFile && handleImport(selectedImportFile, 'merge')}
                         className="flex flex-col items-start gap-3 p-6 border-2 border-slate-100 rounded-2xl hover:border-indigo-600 hover:bg-indigo-50 transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed group"
                       >
-                         <Layers className="w-8 h-8 text-indigo-600" group-hover:scale-105 transition-transform" />
+                         <Layers className="w-8 h-8 text-indigo-600 group-hover:scale-105 transition-transform" />
                          <div>
                             <p className="font-black text-slate-800">{t.dashboard.modeMerge}</p>
                             <p className="text-xs text-slate-400 font-medium mt-1">Smart upsert: Keep your local data and update matching IDs.</p>
