@@ -103,7 +103,6 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
   const onDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    // Set a blank ghost image if desired, but default is fine
   };
 
   const onDragOver = (e: React.DragEvent, index: number) => {
@@ -141,44 +140,61 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
   const renderCard = (def: DataDefinition) => {
     const group = groups.find(g => g.id === def.groupId);
     return (
-      <div key={def.id} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all group flex flex-col relative">
-        <div className="flex items-center gap-5 mb-6">
-          <div className="bg-indigo-50 p-4 rounded-xl shadow-sm flex-shrink-0">
-            <Database className="w-10 h-10 text-indigo-600" />
+      <div key={def.id} className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-indigo-300 hover:shadow-lg shadow-sm transition-all group flex flex-col lg:flex-row items-center gap-6">
+        {/* Module Identity Section */}
+        <div className="flex items-center gap-4 min-w-[280px] max-w-[280px] flex-shrink-0">
+          <div className="bg-indigo-50 p-3 rounded-xl shadow-inner flex-shrink-0">
+            <Database className="w-8 h-8 text-indigo-600" />
           </div>
-          <div className="flex-1 min-w-0 pr-12">
-            <h3 className="text-2xl font-black text-slate-800 leading-tight truncate" title={def.name}>
+          <div className="min-w-0">
+            <h3 className="text-lg font-black text-slate-800 leading-tight truncate" title={def.name}>
               {def.name || 'Untitled'}
             </h3>
-            {group && (
-              <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-sm" style={{ backgroundColor: group.color }}>
-                <Tag className="w-2.5 h-2.5" />
+            {group ? (
+              <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest text-white shadow-sm" style={{ backgroundColor: group.color }}>
                 {group.name}
               </div>
+            ) : (
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Ungrouped</p>
             )}
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => handleEdit(def)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 className="w-4 h-4"/></button>
-          <button onClick={() => handleDelete(def.id)} className="p-2.5 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 className="w-4 h-4"/></button>
+        {/* Info & Columns Section */}
+        <div className="flex-1 min-w-0 space-y-3">
+          <p className="text-slate-500 font-medium line-clamp-1 text-xs leading-relaxed">
+            {def.description || 'No description available for this module.'}
+          </p>
+          <div className="flex flex-wrap gap-1.5 max-h-[64px] overflow-y-auto custom-scrollbar">
+            {def.fields.map(f => (
+              <div key={f.id} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[9px] font-black uppercase tracking-wider text-slate-600 hover:bg-white hover:border-indigo-200 transition-all whitespace-nowrap">
+                {f.name}
+                <span className="text-[7px] text-slate-300 ml-1 font-bold border-l pl-1.5 border-slate-200">
+                  {f.type === FieldType.STRING ? 'STR' : f.type === FieldType.NUMBER ? 'NUM' : f.type === FieldType.DATE ? 'DAT' : 'BOL'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <p className="text-slate-500 font-bold mb-8 line-clamp-2 leading-relaxed text-sm">{def.description || '...'}</p>
-        
-        <div className="mb-8 flex flex-wrap gap-2 min-h-[44px]">
-          {def.fields.slice(0, 4).map(f => (
-            <span key={f.id} className="text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-400 px-3 py-1.5 rounded-full border border-slate-100 whitespace-nowrap">
-              {f.name}
-            </span>
-          ))}
-          {def.fields.length > 4 && <span className="text-[10px] text-slate-400 font-black self-center">+{def.fields.length - 4}</span>}
-        </div>
-
-        <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-auto">
-          <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{def.fields.length} {language === 'zh-CN' ? '个字段' : 'Fields'}</span>
-          <span className="text-xs text-slate-400 font-bold">{t.created} {new Date(def.createdAt).toLocaleDateString()}</span>
+        {/* Meta & Actions Section */}
+        <div className="flex items-center gap-8 pl-6 border-l border-slate-100 flex-shrink-0 ml-auto">
+          <div className="text-right hidden xl:block">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{language === 'zh-CN' ? '创建日期' : 'Created'}</p>
+            <p className="text-xs font-black text-slate-700">{new Date(def.createdAt).toLocaleDateString()}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-center mr-4">
+              <p className="text-[18px] font-black text-indigo-600 leading-none">{def.fields.length}</p>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '字段' : 'Fields'}</p>
+            </div>
+            <button onClick={() => handleEdit(def)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all shadow-sm">
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button onClick={() => handleDelete(def.id)} className="p-2.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-white border border-transparent hover:border-red-100 rounded-xl transition-all shadow-sm">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -206,15 +222,15 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
         <div className="space-y-16">
           {/* Categorized Sections */}
           {groupedDefinitions.map(({ group, defs }) => (
-            <section key={group.id} className="space-y-8 animate-in fade-in slide-in-from-left-4">
+            <section key={group.id} className="space-y-6 animate-in fade-in slide-in-from-left-4">
               <div className="flex items-center gap-4">
-                <div className="w-2 h-10 rounded-full" style={{ backgroundColor: group.color }} />
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: group.color }} />
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
                   {group.name}
-                  <span className="text-sm font-black bg-slate-100 text-slate-400 px-3 py-1 rounded-lg">{defs.length}</span>
+                  <span className="text-xs font-black bg-slate-100 text-slate-400 px-2.5 py-0.5 rounded-lg">{defs.length}</span>
                 </h2>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="flex flex-col gap-4">
                 {defs.map(renderCard)}
               </div>
             </section>
@@ -222,15 +238,15 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
 
           {/* Ungrouped Section */}
           {ungroupedDefs.length > 0 && (
-            <section className="space-y-8 animate-in fade-in slide-in-from-left-4">
+            <section className="space-y-6 animate-in fade-in slide-in-from-left-4">
               <div className="flex items-center gap-4">
-                <div className="w-2 h-10 rounded-full bg-slate-300" />
-                <h2 className="text-3xl font-black text-slate-400 tracking-tight flex items-center gap-3">
+                <div className="w-1.5 h-8 rounded-full bg-slate-300" />
+                <h2 className="text-2xl font-black text-slate-400 tracking-tight flex items-center gap-3">
                   {t.noGroup}
-                  <span className="text-sm font-black bg-slate-100 text-slate-300 px-3 py-1 rounded-lg">{ungroupedDefs.length}</span>
+                  <span className="text-xs font-black bg-slate-100 text-slate-300 px-2.5 py-0.5 rounded-lg">{ungroupedDefs.length}</span>
                 </h2>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="flex flex-col gap-4">
                 {ungroupedDefs.map(renderCard)}
               </div>
             </section>
