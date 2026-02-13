@@ -15,7 +15,8 @@ import {
   Database,
   Edit,
   ChevronDown,
-  Tag
+  Tag,
+  GripVertical
 } from 'lucide-react';
 import { DataDefinition, FieldDefinition, FieldType, DataGroup } from '../types';
 import { translations } from '../translations';
@@ -32,6 +33,10 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
   const t = translations[language].definitions;
   const [isEditing, setIsEditing] = useState(false);
   const [currentDef, setCurrentDef] = useState<DataDefinition | null>(null);
+  
+  // Drag and Drop state
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const startNew = () => {
     setCurrentDef({
@@ -79,6 +84,37 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
     if (!currentDef) return;
     const fields = currentDef.fields.filter((_, i) => i !== index);
     setCurrentDef({ ...currentDef, fields });
+  };
+
+  // Drag and Drop Handlers
+  const onDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedItemIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Set a blank ghost image if desired, but default is fine
+  };
+
+  const onDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const onDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === dropIndex || !currentDef) return;
+
+    const fields = [...currentDef.fields];
+    const itemToMove = fields.splice(draggedItemIndex, 1)[0];
+    fields.splice(dropIndex, 0, itemToMove);
+
+    setCurrentDef({ ...currentDef, fields });
+    setDraggedItemIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const onDragEnd = () => {
+    setDraggedItemIndex(null);
+    setDragOverIndex(null);
   };
 
   // Group definitions by their assigned group
@@ -281,14 +317,24 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
 
               <div className="space-y-4">
                 {currentDef?.fields.map((field, idx) => (
-                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start p-8 border border-slate-100 rounded-xl bg-slate-50/30 group relative transition-all hover:bg-white hover:border-indigo-100 hover:shadow-md">
-                    <button 
-                      onClick={() => removeField(idx)}
-                      className="absolute -right-3 -top-3 bg-white shadow-lg rounded-full p-2 text-slate-300 hover:text-red-600 border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-95"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    
+                  <div 
+                    key={field.id} 
+                    draggable
+                    onDragStart={(e) => onDragStart(e, idx)}
+                    onDragOver={(e) => onDragOver(e, idx)}
+                    onDrop={(e) => onDrop(e, idx)}
+                    onDragEnd={onDragEnd}
+                    className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-start p-6 border rounded-xl relative transition-all group ${
+                      draggedItemIndex === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'
+                    } ${
+                      dragOverIndex === idx ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-100 bg-slate-50/30 hover:bg-white hover:border-indigo-100 hover:shadow-md'
+                    }`}
+                  >
+                    {/* Drag Handle */}
+                    <div className="hidden md:flex items-center justify-center pt-8 cursor-grab active:cursor-grabbing text-slate-300 hover:text-indigo-400">
+                      <GripVertical className="w-5 h-5" />
+                    </div>
+
                     <div className="md:col-span-3 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.fieldName}</label>
                       <input 
@@ -331,7 +377,7 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
                       </label>
                     </div>
 
-                    <div className="md:col-span-5 space-y-2">
+                    <div className="md:col-span-4 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.desc}</label>
                       <input 
                         type="text" 
@@ -341,6 +387,14 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
                         placeholder="..."
                       />
                     </div>
+
+                    {/* Delete Button */}
+                    <button 
+                      onClick={() => removeField(idx)}
+                      className="absolute -right-3 -top-3 bg-white shadow-lg rounded-full p-2 text-slate-300 hover:text-red-600 border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-10"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
