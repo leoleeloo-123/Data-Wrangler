@@ -35,7 +35,10 @@ export const translations = {
       modeReplace: 'Replace All (Overwrite existing data)',
       modeMerge: 'Merge & Upsert (Combine with existing data)',
       importSuccess: 'Configuration updated successfully.',
-      importError: 'Failed to import. Please check file format.'
+      importError: 'Failed to import. Please check file format.',
+      userName: 'User Name',
+      companyName: 'Company Name',
+      contextTitle: 'Identity Context'
     },
     definitions: {
       title: 'Data Collection Definitions',
@@ -153,7 +156,10 @@ export const translations = {
       modeReplace: '完全替换 (删除现有数据，使用导入内容)',
       modeMerge: '合并更新 (保留现有数据，增量更新导入内容)',
       importSuccess: '配置已成功更新。',
-      importError: '导入失败，请确保文件格式正确。'
+      importError: '导入失败，请确保文件格式正确。',
+      userName: '用户名',
+      companyName: '企业名称',
+      contextTitle: '身份上下文'
     },
     definitions: {
       title: '数据采集定义',

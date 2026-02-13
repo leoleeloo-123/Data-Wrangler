@@ -21,7 +21,9 @@ import {
   Upload as UploadIcon,
   Layers,
   FileJson,
-  PlusCircle
+  PlusCircle,
+  User as UserIcon,
+  Building as BuildingIcon
 } from 'lucide-react';
 
 declare const XLSX: any;
@@ -34,11 +36,24 @@ const App: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   
+  // User & Company Context
+  const [userName, setUserName] = useState(localStorage.getItem('tax-user-name') || '');
+  const [companyName, setCompanyName] = useState(localStorage.getItem('tax-company-name') || '');
+  
   // System Config State
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [language, setLanguage] = useState<'en-US' | 'zh-CN'>('zh-CN');
 
   const t = translations[language];
+
+  // Sync Profile to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('tax-user-name', userName);
+  }, [userName]);
+
+  useEffect(() => {
+    localStorage.setItem('tax-company-name', companyName);
+  }, [companyName]);
 
   // Initialize data
   useEffect(() => {
@@ -141,7 +156,14 @@ const App: React.FC = () => {
     const templateSheet = XLSX.utils.json_to_sheet(templateData);
     XLSX.utils.book_append_sheet(wb, templateSheet, "Templates");
 
-    XLSX.writeFile(wb, `TaxStandard_Config_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Format filename: TaxStandard_Config_CompanyName_UserName_DateTime
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
+    const safeCompany = (companyName || 'UnknownCompany').replace(/[^a-z0-9]/gi, '_');
+    const safeUser = (userName || 'UnknownUser').replace(/[^a-z0-9]/gi, '_');
+    
+    XLSX.writeFile(wb, `TaxStandard_Config_${safeCompany}_${safeUser}_${dateStr}_${timeStr}.xlsx`);
   };
 
   // Import Logic
@@ -396,7 +418,7 @@ const App: React.FC = () => {
       {isConfigOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsConfigOpen(false)} />
-          <div className="relative bg-white w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+          <div className="relative bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="bg-indigo-100 p-2.5 rounded-2xl">
@@ -413,6 +435,40 @@ const App: React.FC = () => {
             </div>
             
             <div className="p-10 space-y-10">
+              {/* Identity Context Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-indigo-100 p-2 rounded-xl">
+                      <UserIcon className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dashboard.userName}</label>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="e.g. Alex Rivera"
+                    className="w-full px-5 py-3 border border-slate-200 rounded-2xl font-bold text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-100 p-2 rounded-xl">
+                      <BuildingIcon className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dashboard.companyName}</label>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Global Tech Solutions"
+                    className="w-full px-5 py-3 border border-slate-200 rounded-2xl font-bold text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-emerald-100 transition-all"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 group transition-all hover:bg-white hover:border-indigo-100">
                 <div className="flex items-center gap-4">
                   <div className="bg-indigo-100 p-3 rounded-2xl group-hover:bg-indigo-600 transition-colors">
