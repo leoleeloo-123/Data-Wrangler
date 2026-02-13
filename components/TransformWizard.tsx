@@ -32,7 +32,8 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   FileOutput,
-  Copy
+  Copy,
+  TableProperties
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -88,6 +89,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   // Export States
   const [exportFileName, setExportFileName] = useState('Standardized_Tax_Data');
   const [exportSheetName, setExportSheetName] = useState('StandardizedData');
+  const [includeFileName, setIncludeFileName] = useState(true);
+  const [fileNamePosition, setFileNamePosition] = useState<'front' | 'back'>('front');
 
   // Template State
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -250,6 +253,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setAvailableHeaders(tpl.expectedHeaders || []);
     setExportFileName(tpl.exportFileName);
     setExportSheetName(tpl.exportSheetName);
+    setIncludeFileName(tpl.includeFileName ?? true);
+    setFileNamePosition(tpl.fileNamePosition || 'front');
     
     // Skip Step 2 & 3, go straight to Batch Upload
     setStep(4); 
@@ -270,6 +275,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       expectedHeaders: availableHeaders,
       exportFileName,
       exportSheetName,
+      includeFileName,
+      fileNamePosition,
       updatedAt: new Date().toISOString()
     };
     onSaveTemplate(template);
@@ -289,6 +296,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setAvailableHeaders([]);
     setMapping({});
     setNewTemplateName('');
+    setIncludeFileName(true);
+    setFileNamePosition('front');
   };
 
   const autoMap = async () => {
@@ -397,13 +406,28 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const handleExport = () => {
     if (!results) return;
     try {
-      // Create clean rows for export (remove internal metadata)
-      const cleanRows = results.rows.map(row => {
-        const { __source_file__, __source_sheet__, ...clean } = row;
-        return clean;
+      // Reconstruct rows based on table config
+      const exportRows = results.rows.map(row => {
+        const infoStr = `${row.__source_file__}_${row.__source_sheet__}`;
+        const { __source_file__, __source_sheet__, ...dataFields } = row;
+        
+        const finalRow: any = {};
+        const fileNameHeader = t.fileNameColumn;
+
+        if (includeFileName && fileNamePosition === 'front') {
+          finalRow[fileNameHeader] = infoStr;
+        }
+
+        Object.assign(finalRow, dataFields);
+
+        if (includeFileName && fileNamePosition === 'back') {
+          finalRow[fileNameHeader] = infoStr;
+        }
+
+        return finalRow;
       });
       
-      const worksheet = XLSX.utils.json_to_sheet(cleanRows);
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
       XLSX.writeFile(workbook, `${exportFileName || 'Standardized_Data'}.xlsx`);
@@ -959,48 +983,48 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
       {step === 6 && selectedDef && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 max-w-[1400px] mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 flex flex-col hover:shadow-xl transition-all">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
               <div className="flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-[10px]">
-                <Database className="w-5 h-5" />
+                <Database className="w-4 h-4" />
                 {t.summaryTarget}
               </div>
               <div className="flex-1">
-                <h4 className="text-3xl font-black text-slate-800 leading-tight tracking-tight">{selectedDef.name}</h4>
-                <p className="text-sm text-slate-500 mt-4 font-bold leading-relaxed line-clamp-3">{selectedDef.description}</p>
+                <h4 className="text-2xl font-black text-slate-800 leading-tight tracking-tight">{selectedDef.name}</h4>
+                <p className="text-xs text-slate-500 mt-2 font-bold leading-relaxed line-clamp-3">{selectedDef.description}</p>
               </div>
             </div>
 
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-10 flex flex-col hover:shadow-xl transition-all">
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8 flex flex-col hover:shadow-xl transition-all">
               <div className="flex items-center gap-3 text-emerald-600 font-black uppercase tracking-widest text-[10px]">
-                <Settings2 className="w-5 h-5" />
+                <Settings2 className="w-4 h-4" />
                 {t.summarySource}
               </div>
-              <div className="space-y-6 flex-1">
+              <div className="space-y-4 flex-1">
                 {[
                   { label: 'Sheet', val: selectedSheet },
                   { label: 'Header Row', val: startRow },
                   { label: 'Batch Files', val: `${batchFiles.filter(f => f.isValid).length} Valid` }
                 ].map((row, idx) => (
-                  <div key={idx} className="flex justify-between items-center py-3 border-b border-slate-50 last:border-0">
-                    <span className="text-slate-400 font-black text-[10px] uppercase tracking-widest">{row.label}</span>
-                    <span className="font-black text-slate-800">{row.val}</span>
+                  <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                    <span className="text-slate-400 font-black text-[9px] uppercase tracking-widest">{row.label}</span>
+                    <span className="font-black text-slate-800 text-sm truncate ml-2">{row.val}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 flex flex-col h-full hover:shadow-xl transition-all">
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col h-full hover:shadow-xl transition-all">
               <div className="flex items-center gap-3 text-amber-500 font-black uppercase tracking-widest text-[10px]">
-                <Map className="w-5 h-5" />
+                <Map className="w-4 h-4" />
                 {t.summaryMapping}
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-4">
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                 {selectedDef.fields.map(f => (
-                  <div key={f.id} className="flex items-center justify-between gap-6 py-3 border-b border-slate-50 last:border-0">
-                    <span className="text-[11px] font-black text-slate-500 truncate flex-shrink-0 uppercase tracking-wider">{f.name}</span>
+                  <div key={f.id} className="flex items-center justify-between gap-4 py-2 border-b border-slate-50 last:border-0">
+                    <span className="text-[10px] font-black text-slate-500 truncate flex-shrink-0 uppercase tracking-wider">{f.name}</span>
                     <ArrowRight className="w-3 h-3 text-slate-200" />
-                    <span className="text-xs font-black text-indigo-600 truncate text-right">
+                    <span className="text-[10px] font-black text-indigo-600 truncate text-right">
                       {mapping[f.id] || (language === 'zh-CN' ? '未映射' : 'Not Mapped')}
                     </span>
                   </div>
@@ -1008,30 +1032,66 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
             </div>
 
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 flex flex-col hover:shadow-xl transition-all">
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
               <div className="flex items-center gap-3 text-pink-500 font-black uppercase tracking-widest text-[10px]">
-                <FileOutput className="w-5 h-5" />
+                <FileOutput className="w-4 h-4" />
                 {language === 'zh-CN' ? '输出配置' : 'Output Config'}
               </div>
-              <div className="space-y-6 flex-1">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
+              <div className="space-y-4 flex-1">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
                   <input 
                     type="text" 
                     value={exportFileName} 
                     onChange={(e) => setExportFileName(e.target.value)} 
-                    className="w-full px-5 py-4 border border-slate-200 rounded-2xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-8 focus:ring-pink-50 transition-all text-xs"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-pink-50 transition-all text-[11px]"
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
                   <input 
                     type="text" 
                     value={exportSheetName} 
                     onChange={(e) => setExportSheetName(e.target.value)} 
-                    className="w-full px-5 py-4 border border-slate-200 rounded-2xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-8 focus:ring-pink-50 transition-all text-xs"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-pink-50 transition-all text-[11px]"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Table Config Card */}
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
+              <div className="flex items-center gap-3 text-cyan-500 font-black uppercase tracking-widest text-[10px]">
+                <TableProperties className="w-4 h-4" />
+                {t.tableConfig}
+              </div>
+              <div className="space-y-6 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.showFileName}</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={includeFileName} onChange={(e) => setIncludeFileName(e.target.checked)} />
+                    <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
+                  </label>
+                </div>
+                {includeFileName && (
+                  <div className="space-y-3 pt-2 border-t border-slate-50">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.colPosition}</label>
+                    <div className="flex bg-slate-50 p-1 rounded-xl">
+                      <button 
+                        onClick={() => setFileNamePosition('front')}
+                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${fileNamePosition === 'front' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        {t.posFront}
+                      </button>
+                      <button 
+                        onClick={() => setFileNamePosition('back')}
+                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${fileNamePosition === 'back' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        {t.posBack}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

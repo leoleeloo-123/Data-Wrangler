@@ -151,7 +151,9 @@ const App: React.FC = () => {
       exportSheetName: tpl.exportSheetName,
       updatedAt: tpl.updatedAt,
       mapping: JSON.stringify(tpl.mapping),
-      expectedHeaders: JSON.stringify(tpl.expectedHeaders || [])
+      expectedHeaders: JSON.stringify(tpl.expectedHeaders || []),
+      includeFileName: tpl.includeFileName ? 1 : 0,
+      fileNamePosition: tpl.fileNamePosition
     }));
     const templateSheet = XLSX.utils.json_to_sheet(templateData);
     XLSX.utils.book_append_sheet(wb, templateSheet, "Templates");
@@ -193,7 +195,9 @@ const App: React.FC = () => {
           newTemplates = raw.map((r: any) => ({
             ...r,
             mapping: typeof r.mapping === 'string' ? JSON.parse(r.mapping) : r.mapping,
-            expectedHeaders: typeof r.expectedHeaders === 'string' ? JSON.parse(r.expectedHeaders) : (r.expectedHeaders || [])
+            expectedHeaders: typeof r.expectedHeaders === 'string' ? JSON.parse(r.expectedHeaders) : (r.expectedHeaders || []),
+            includeFileName: Number(r.includeFileName) === 1,
+            fileNamePosition: r.fileNamePosition || 'front'
           }));
         }
 

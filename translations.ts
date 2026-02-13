@@ -116,7 +116,12 @@ export const translations = {
       totalFiles: 'Total Files',
       noDataPreview: 'No data available to preview.',
       unmappedFields: 'unmapped fields',
-      fileNameColumn: 'File Name'
+      fileNameColumn: 'File Name',
+      tableConfig: 'Table Config',
+      showFileName: 'Include File Name',
+      colPosition: 'Column Position',
+      posFront: 'Front',
+      posBack: 'Back'
     },
     config: {
       title: 'System Config',
@@ -242,7 +247,12 @@ export const translations = {
       totalFiles: '文件总数',
       noDataPreview: '暂无预览数据。',
       unmappedFields: '个未映射字段',
-      fileNameColumn: '文件名'
+      fileNameColumn: '文件名',
+      tableConfig: '表格配置',
+      showFileName: '输出文件名',
+      colPosition: '列位置',
+      posFront: '表格前方',
+      posBack: '表格后方'
     },
     config: {
       title: '系统配置',

@@ -58,4 +58,6 @@ export interface TransformationTemplate {
   exportFileName: string;
   exportSheetName: string;
   updatedAt: string;
+  includeFileName: boolean;
+  fileNamePosition: 'front' | 'back';
 }
