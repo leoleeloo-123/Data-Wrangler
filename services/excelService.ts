@@ -7,28 +7,21 @@ export interface ExcelSheetInfo {
   previewRows: any[];
 }
 
-/**
- * Fast metadata parsing. 
- * First gets sheet names without parsing data, then only parses headers for the first few sheets to keep it snappy.
- */
 export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // Step 1: Read only the workbook structure (lightning fast)
-        const workbook = XLSX.read(data, { type: 'array', bookSheets: true });
-        
-        // Step 2: For metadata/preview, we only parse the first 5 rows of the first few sheets
-        // to avoid freezing the UI on multi-tab massive files.
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheets: ExcelSheetInfo[] = workbook.SheetNames.map((name: string) => {
-          // We don't parse full headers here for every sheet if there are many. 
-          // We let the UI request specific sheet details as needed.
+          const worksheet = workbook.Sheets[name];
+          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0, defval: "" });
+          const headers = (json[0] || []) as string[];
           return {
             name,
-            headers: [],
-            previewRows: []
+            headers: headers.filter(h => h && h.toString().trim() !== ""),
+            previewRows: json.slice(1, 6)
           };
         });
         resolve(sheets);
@@ -41,9 +34,6 @@ export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> 
   });
 };
 
-/**
- * Optimized extraction that only reads the required number of rows.
- */
 export const extractSheetData = async (
   file: File, 
   sheetName: string, 
@@ -55,29 +45,32 @@ export const extractSheetData = async (
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
         
-        // Performance Opt: If endRow is provided, tell the parser to STOP reading after that row.
-        // This is critical for massive files.
-        const readOptions: any = { type: 'array' };
-        if (endRow !== undefined && endRow !== null) {
-          readOptions.sheetRows = endRow + 1;
-        }
-
-        const workbook = XLSX.read(data, readOptions);
+        // Attempt to find worksheet by name
         let worksheet = workbook.Sheets[sheetName];
         
+        // Robustness: If specified sheet name isn't found, try falling back to the first sheet
         if (!worksheet && workbook.SheetNames.length > 0) {
+          console.warn(`Sheet "${sheetName}" not found in file "${file.name}". Using first sheet: "${workbook.SheetNames[0]}"`);
           worksheet = workbook.Sheets[workbook.SheetNames[0]];
         }
 
-        if (!worksheet) throw new Error(`Sheet "${sheetName}" not found.`);
+        if (!worksheet) throw new Error(`Sheet "${sheetName}" not found and no alternative sheets available.`);
         
+        // Convert to JSON starting from startRow (0-indexed)
         const json = XLSX.utils.sheet_to_json(worksheet, { 
           range: startRow,
           defval: null
         }) as any[];
 
-        resolve(json);
+        // If endRow is specified, slice the array.
+        if (endRow !== undefined && endRow !== null) {
+          const limit = Math.max(0, endRow - startRow);
+          resolve(json.slice(0, limit));
+        } else {
+          resolve(json);
+        }
       } catch (err) {
         reject(err);
       }
