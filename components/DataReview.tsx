@@ -15,7 +15,9 @@ import {
   X,
   Clock,
   Files,
-  FileDown
+  FileDown,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { DataReviewEntry } from '../types';
 import { translations } from '../translations';
@@ -30,6 +32,7 @@ interface DataReviewProps {
 
 const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, language }) => {
   const t = translations[language];
+  const tr = t.transform;
   const [selectedEntry, setSelectedEntry] = useState<DataReviewEntry | null>(null);
   const [activeTaskIdx, setActiveTaskIdx] = useState(0);
 
@@ -40,6 +43,12 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
       XLSX.utils.book_append_sheet(wb, ws, task.sheetName.substring(0, 31));
     });
     XLSX.writeFile(wb, `${entry.batchName}_Review.xlsx`);
+  };
+
+  const calculateHealthScore = (rows: number, errors: number, fieldCount: number) => {
+    if (rows === 0) return "100.0";
+    const totalPotentialChecks = rows * fieldCount;
+    return Math.max(0, 100 - (errors / totalPotentialChecks * 100)).toFixed(1);
   };
 
   return (
@@ -97,7 +106,7 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
 
                 <div className="flex items-center gap-3 relative z-10 w-full md:w-auto justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-8">
                   <button 
-                    onClick={() => setSelectedEntry(entry)}
+                    onClick={() => { setSelectedEntry(entry); setActiveTaskIdx(0); }}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5 active:scale-95"
                   >
                     <Eye className="w-5 h-5" /> {language === 'zh-CN' ? '查看详情' : 'Inspect'}
@@ -135,12 +144,44 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
         <div className="space-y-12 animate-in zoom-in-95 duration-300">
           <div className="flex items-center justify-between">
             <button onClick={() => setSelectedEntry(null)} className="text-indigo-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:underline">
-               &larr; {language === 'zh-CN' ? '返回 Review 列表' : 'Back to List'}
+               &larr; {language === 'zh-CN' ? '返回列表' : 'Back to List'}
             </button>
             <div className="flex gap-4">
-              <button onClick={() => handleDownloadEntry(selectedEntry)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-emerald-100 transition-all">
-                <Download className="w-5 h-5" /> Export Review (.xlsx)
+              <button onClick={() => handleDownloadEntry(selectedEntry)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-emerald-100 transition-all transform hover:-translate-y-0.5">
+                <Download className="w-5 h-5" /> {language === 'zh-CN' ? '导出复核报告 (.xlsx)' : 'Export Review (.xlsx)'}
               </button>
+            </div>
+          </div>
+
+          {/* New Summary Cards matched with step 5 wizard */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 items-stretch">
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{tr.rowsProcessed}</p>
+              <h3 className={`text-2xl font-black tracking-tight text-slate-800`}>
+                {language === 'zh-CN' ? `${selectedEntry.tasks.length}个模型共 ${selectedEntry.totalRows} 行` : `${selectedEntry.tasks.length} models totaling ${selectedEntry.totalRows} rows`}
+              </h3>
+            </div>
+            
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-red-400 transition-colors">{tr.qualityIssues}</p>
+              <h3 className={`text-5xl font-black tracking-tight ${selectedEntry.totalErrors > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {selectedEntry.totalErrors.toLocaleString()}
+              </h3>
+            </div>
+
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{tr.healthScore}</p>
+              <h3 className={`text-5xl font-black tracking-tight text-indigo-600`}>
+                {calculateHealthScore(selectedEntry.totalRows, selectedEntry.totalErrors, selectedEntry.tasks[0]?.fieldMetadata.length || 1)}%
+              </h3>
+            </div>
+
+            <div className="bg-indigo-600 text-white p-10 rounded-[48px] shadow-2xl shadow-indigo-100 flex flex-col justify-center items-center gap-4">
+              <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest">{language === 'zh-CN' ? '报告状态' : 'Audit Status'}</p>
+              <h3 className="text-2xl font-black text-center leading-tight">
+                {language === 'zh-CN' ? '快照已就绪' : 'Snapshot Validated'}
+              </h3>
+              <CheckCircle2 className="w-8 h-8 text-indigo-200" />
             </div>
           </div>
 
@@ -152,7 +193,9 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
                <div>
                   <h2 className="text-4xl font-black text-slate-800 tracking-tighter">{selectedEntry.batchName}</h2>
                   <div className="flex items-center gap-4 mt-2">
-                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm">{selectedEntry.strategy === 'multi-sheet' ? 'Split Files' : 'Consolidated Sheet'} • Created {new Date(selectedEntry.timestamp).toLocaleString()}</p>
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm">
+                      {selectedEntry.strategy === 'multi-sheet' ? 'Split Files' : 'Consolidated Sheet'} • Created {new Date(selectedEntry.timestamp).toLocaleString()}
+                    </p>
                   </div>
                </div>
             </div>
@@ -167,8 +210,13 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
                         onClick={() => setActiveTaskIdx(idx)}
                         className={`w-full p-6 rounded-[32px] text-left transition-all border-2 flex flex-col gap-1 ${activeTaskIdx === idx ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-105' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-indigo-300'}`}
                       >
-                        <p className="font-black text-lg truncate leading-tight">{task.modelName}</p>
-                        <p className={`text-[10px] font-bold uppercase tracking-widest ${activeTaskIdx === idx ? 'text-indigo-200' : 'text-slate-400'}`}>{task.rowCount} Rows • {task.sheetName}</p>
+                        <div className="flex justify-between items-start w-full">
+                          <p className="font-black text-lg truncate leading-tight flex-1">{task.modelName}</p>
+                          {task.errorCount > 0 && <AlertCircle className={`w-4 h-4 flex-shrink-0 ml-2 ${activeTaskIdx === idx ? 'text-red-300' : 'text-red-500'}`} />}
+                        </div>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${activeTaskIdx === idx ? 'text-indigo-200' : 'text-slate-400'}`}>
+                          {task.rowCount} Rows • {task.errorCount} Issues
+                        </p>
                       </button>
                     ))}
                   </div>
@@ -182,21 +230,40 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
                     <div className="flex-1 overflow-auto custom-scrollbar">
                        {selectedEntry.tasks[activeTaskIdx].rows.length > 0 ? (
                          <table className="w-full text-left text-[11px] border-collapse">
-                            <thead className="bg-white sticky top-0 z-10 shadow-sm">
+                            <thead className="bg-white sticky top-0 z-10 shadow-sm border-b-2 border-slate-100">
                                <tr>
-                                  {Object.keys(selectedEntry.tasks[activeTaskIdx].rows[0]).map((key, i) => (
-                                    <th key={i} className="px-6 py-4 font-black text-slate-800 uppercase tracking-widest border-b-2 border-slate-100 whitespace-nowrap">{key}</th>
+                                  <th className="px-8 py-6 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-r border-slate-100 w-16 text-center">#</th>
+                                  <th className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest bg-slate-50 border-r border-slate-100 min-w-[200px]">{tr.fileNameColumn}</th>
+                                  {selectedEntry.tasks[activeTaskIdx].fieldMetadata.map((f, i) => (
+                                    <th key={i} className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest bg-slate-50 whitespace-nowrap">
+                                      {f.name}
+                                      <span className={`ml-2 text-[10px] font-black px-2 py-0.5 rounded-full ${f.mismatchCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                                        ({f.type} | {f.mismatchCount})
+                                      </span>
+                                    </th>
                                   ))}
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                               {selectedEntry.tasks[activeTaskIdx].rows.slice(0, 100).map((row, rIdx) => (
-                                 <tr key={rIdx} className="hover:bg-indigo-50/20 transition-colors">
-                                    {Object.values(row).map((val, cIdx) => (
-                                      <td key={cIdx} className="px-6 py-4 whitespace-nowrap font-bold text-slate-500">{String(val || '')}</td>
-                                    ))}
-                                 </tr>
-                               ))}
+                               {selectedEntry.tasks[activeTaskIdx].rows.slice(0, 100).map((row, rIdx) => {
+                                 // Handle rows which might have source metadata keys
+                                 const { __source_file__, __source_sheet__, ...dataFields } = row;
+                                 const fileNameStr = (row[tr.fileNameColumn] as string) || `${__source_file__ || '?'}_${__source_sheet__ || '?'}`;
+                                 
+                                 return (
+                                   <tr key={rIdx} className="hover:bg-indigo-50/20 transition-colors">
+                                      <td className="px-8 py-4 text-slate-300 font-black bg-slate-50/30 text-center border-r border-slate-50">{rIdx + 1}</td>
+                                      <td className="px-8 py-4 text-slate-400 font-black italic border-r border-slate-50 truncate max-w-[200px]">
+                                        {fileNameStr}
+                                      </td>
+                                      {selectedEntry.tasks[activeTaskIdx].fieldMetadata.map((f, cIdx) => (
+                                        <td key={cIdx} className="px-8 py-4 whitespace-nowrap font-bold text-slate-500">
+                                          {row[f.name] !== undefined && row[f.name] !== null ? String(row[f.name]) : <span className="text-slate-200 italic font-black">NULL</span>}
+                                        </td>
+                                      ))}
+                                   </tr>
+                                 );
+                               })}
                             </tbody>
                          </table>
                        ) : (

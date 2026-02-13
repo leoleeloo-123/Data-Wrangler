@@ -94,11 +94,19 @@ export interface DataReviewEntry {
   batchName: string;
   timestamp: string;
   strategy: 'multi-sheet' | 'consolidated';
+  totalRows: number;
+  totalErrors: number;
   tasks: {
     modelName: string;
     rowCount: number;
     sheetName: string;
     fileName: string;
     rows: any[];
+    errorCount: number;
+    fieldMetadata: {
+      name: string;
+      type: string;
+      mismatchCount: number;
+    }[];
   }[];
 }

@@ -316,15 +316,28 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
   const exportToReview = () => {
     if (!currentBatch) return;
+    let totalBatchRows = 0;
+    let totalBatchErrors = 0;
+
     const tasksForReview = currentBatch.tasks.filter(t => t.status === 'completed').map(task => {
         const template = templates.find(tpl => tpl.id === task.templateId)!;
         const def = definitions.find(d => d.id === template.definitionId)!;
+        
+        totalBatchRows += task.results?.rows.length || 0;
+        totalBatchErrors += task.results?.errors.length || 0;
+
         return {
            modelName: template.name,
            rowCount: task.results?.rows.length || 0,
            sheetName: task.customOutputSheetName,
            fileName: task.customOutputFileName,
-           rows: getCleanRowsForTask(task, template, def)
+           rows: getCleanRowsForTask(task, template, def),
+           errorCount: task.results?.errors.length || 0,
+           fieldMetadata: def.fields.map(f => ({
+             name: f.name,
+             type: f.type,
+             mismatchCount: task.results?.fieldStats[f.name]?.mismatchCount || 0
+           }))
         };
     });
 
@@ -338,6 +351,8 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
        batchName: currentBatch.name || 'Unnamed Batch',
        timestamp: new Date().toISOString(),
        strategy: currentBatch.exportStrategy,
+       totalRows: totalBatchRows,
+       totalErrors: totalBatchErrors,
        tasks: tasksForReview
     };
 
