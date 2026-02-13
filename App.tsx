@@ -26,7 +26,8 @@ import {
   PlusCircle,
   User as UserIcon,
   Building as BuildingIcon,
-  ClipboardCheck
+  ClipboardCheck,
+  Trash2
 } from 'lucide-react';
 
 declare const XLSX: any;
@@ -168,6 +169,20 @@ const App: React.FC = () => {
     const updated = reviewEntries.filter(e => e.id !== id);
     setReviewEntries(updated);
     localStorage.setItem('tax-review-entries', JSON.stringify(updated));
+  };
+
+  const clearAllConfiguration = () => {
+    if (confirm(t.dashboard.clearConfirm)) {
+      setDefinitions([]);
+      setTemplates([]);
+      setBatches([]);
+      setReviewEntries([]);
+      localStorage.removeItem('tax-definitions');
+      localStorage.removeItem('tax-transformation-templates');
+      localStorage.removeItem('tax-batch-configs');
+      localStorage.removeItem('tax-review-entries');
+      alert(language === 'zh-CN' ? '所有配置已清空。' : 'All configuration has been cleared.');
+    }
   };
 
   // Export Logic
@@ -375,8 +390,8 @@ const App: React.FC = () => {
               </div>
               <div className="flex gap-4">
                 <div className="bg-white border border-slate-200 px-6 py-3 rounded-2xl flex items-center gap-3 shadow-sm border-b-4 border-b-emerald-500">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-sm font-black text-slate-600 uppercase tracking-widest">{t.dashboard.syncActive}</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-widest">{t.dashboard.syncActive}</span>
                 </div>
               </div>
             </header>
@@ -390,28 +405,30 @@ const App: React.FC = () => {
               ].map((stat, i) => (
                 <div key={i} className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all flex flex-col gap-2 group">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{stat.label}</span>
-                  <span className={`text-4xl font-black ${stat.color === 'indigo' ? 'text-indigo-600' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-slate-800'}`}>
-                    {stat.value}
-                  </span>
-                  {stat.delta && (
-                    <div className="mt-4 flex items-center gap-1.5 text-[11px] text-emerald-600 font-black bg-emerald-50 self-start px-3 py-1 rounded-full border border-emerald-100">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {stat.delta} {t.dashboard.thisMonth}
-                    </div>
-                  )}
+                  <div className="flex items-end gap-3">
+                    <span className={`text-5xl font-black ${stat.color === 'indigo' ? 'text-indigo-600' : stat.color === 'emerald' ? 'text-emerald-500' : 'text-slate-800'}`}>
+                      {stat.value}
+                    </span>
+                    {stat.delta && (
+                      <div className="mb-2 flex items-center gap-1.5 text-[10px] text-emerald-600 font-black bg-emerald-50 self-start px-3 py-1 rounded-full border border-emerald-100">
+                         {stat.delta} {t.dashboard.thisMonth}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
               <div className="lg:col-span-8 space-y-12">
-                <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 text-indigo-50 group-hover:text-indigo-100 transition-colors">
-                     <Share2 className="w-24 h-24" />
+                {/* Configuration Management Card matching screenshot */}
+                <div className="bg-white p-12 rounded-[56px] border border-slate-200 shadow-sm space-y-8 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-12 text-slate-50 group-hover:text-indigo-50 transition-colors">
+                     <Share2 className="w-32 h-32" />
                   </div>
-                  <div className="relative z-10 space-y-4">
+                  <div className="relative z-10 space-y-6">
                     <h3 className="text-3xl font-black text-slate-800 tracking-tight">{t.dashboard.configMgmt}</h3>
-                    <p className="text-slate-500 font-bold max-w-xl text-lg">
+                    <p className="text-slate-500 font-bold max-w-xl text-lg leading-relaxed">
                       {t.dashboard.configDesc}
                     </p>
                     <div className="flex flex-wrap gap-4 pt-4">
@@ -424,10 +441,18 @@ const App: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => setIsImportOpen(true)}
-                        className="bg-white border-2 border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-600 font-black px-10 py-5 rounded-[32px] transition-all flex items-center gap-3 transform hover:-translate-y-1 active:scale-95"
+                        className="bg-white border-2 border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-600 font-black px-10 py-5 rounded-[32px] transition-all flex items-center gap-3 transform hover:-translate-y-1 active:scale-95 shadow-sm"
                       >
                         <UploadIcon className="w-6 h-6" />
                         {t.dashboard.importBtn}
+                      </button>
+                      {/* New Clear Config Button */}
+                      <button 
+                        onClick={clearAllConfiguration}
+                        className="bg-white border-2 border-red-100 hover:border-red-600 hover:bg-red-50 text-red-400 hover:text-red-600 font-black px-8 py-5 rounded-[32px] transition-all flex items-center gap-3 transform hover:-translate-y-1 active:scale-95 shadow-sm ml-auto"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        {t.dashboard.clearBtn}
                       </button>
                     </div>
                   </div>
@@ -436,14 +461,11 @@ const App: React.FC = () => {
                 <div className="space-y-8">
                   <div className="flex items-center justify-between">
                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.dashboard.recentBatches}</h3>
-                    <button className="text-indigo-600 font-black text-xs uppercase tracking-widest hover:underline">{t.dashboard.viewAll}</button>
+                    <button onClick={() => setActiveTab('review')} className="text-indigo-600 font-black text-xs uppercase tracking-widest hover:underline">{t.dashboard.viewAll}</button>
                   </div>
                   <div className="grid grid-cols-1 gap-4">
                     {[
-                      { title: 'VAT_EMEA_MAR25_Consolidation', user: 'Sarah Jenkins', status: 'Success', time: '1h ago', rows: '45,231' },
-                      { title: 'CIT_APAC_Standardization', user: 'David Liu', status: 'Success', time: '3h ago', rows: '12,009' },
-                      { title: 'WHT_Annual_Global_Report', user: 'Mark Chen', status: 'Warning', time: '5h ago', rows: '89,322' },
-                      { title: 'TAX_UK_Quarterly_Return', user: 'System Automated', status: 'Success', time: '1d ago', rows: '210,000' },
+                      { title: 'VAT_EMEA_MAR25_Consolidation', user: 'Sarah Jenkins', status: 'Success', time: '1H AGO', rows: '45,231' },
                     ].map((log, i) => (
                       <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 flex items-center justify-between hover:border-indigo-200 hover:shadow-sm transition-all group">
                         <div className="flex items-center gap-6">
@@ -456,7 +478,7 @@ const App: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-sm text-slate-400 font-black uppercase tracking-widest">{log.time}</span>
+                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{log.time}</span>
                         </div>
                       </div>
                     ))}
@@ -464,41 +486,43 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Sidebar Quick Actions and Governance matched with screenshot */}
               <div className="lg:col-span-4 space-y-10">
                 <div className="space-y-6">
                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.dashboard.quickActions}</h3>
                   <div className="space-y-4">
                     <button 
-                      onClick={() => setActiveTab('import')}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-6 rounded-[32px] shadow-2xl shadow-indigo-100 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 text-lg"
+                      onClick={() => setActiveTab('batch')}
+                      className="w-full bg-gradient-to-br from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 text-white font-black py-7 rounded-[32px] shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-4 transform hover:-translate-y-1 text-lg group"
                     >
-                      <PlusCircle className="w-6 h-6" />
+                      <PlusCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
                       {t.dashboard.newBatch}
+                      <div className="h-0.5 flex-1 bg-white/20 mx-4 rounded-full" />
                     </button>
                     <button 
                       onClick={() => setActiveTab('review')}
-                      className="w-full bg-white border-2 border-slate-200 hover:border-indigo-200 text-slate-600 font-black py-6 rounded-[32px] transition-all flex items-center justify-center gap-3 text-lg"
+                      className="w-full bg-white border-2 border-slate-100 hover:border-indigo-200 text-slate-600 font-black py-7 rounded-[32px] transition-all flex items-center justify-center gap-4 text-lg shadow-sm"
                     >
-                      <ClipboardCheck className="w-6 h-6" />
-                      {language === 'zh-CN' ? 'Data Review' : 'Review Results'}
+                      <ClipboardCheck className="w-6 h-6 text-indigo-500" />
+                      {t.sidebar.review}
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-indigo-900 p-8 rounded-[40px] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700" />
-                  <div className="relative z-10">
-                    <h4 className="font-black text-xl mb-4 flex items-center gap-2">
-                      <Info className="w-5 h-5" />
+                <div className="bg-indigo-900 p-10 rounded-[48px] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden group min-h-[280px] flex flex-col justify-between">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-1000" />
+                  <div className="relative z-10 space-y-6">
+                    <h4 className="font-black text-xl flex items-center gap-3 uppercase tracking-widest text-indigo-200">
+                      <Info className="w-6 h-6 text-indigo-400" />
                       {t.dashboard.governanceTip}
                     </h4>
-                    <p className="text-sm text-indigo-200 font-bold leading-relaxed mb-6">
+                    <p className="text-base text-indigo-100 font-bold leading-relaxed opacity-80">
                       {t.dashboard.governanceDesc}
                     </p>
-                    <button className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors">
-                      {t.dashboard.learnPolicy} <ArrowRight className="w-3 h-3" />
-                    </button>
                   </div>
+                  <button className="relative z-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-indigo-400 hover:text-white transition-colors pt-4 group">
+                    {t.dashboard.learnPolicy} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
                 </div>
               </div>
             </div>
