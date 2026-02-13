@@ -117,3 +117,12 @@ export interface DataReviewEntry {
     }[];
   }[];
 }
+
+// Fixed missing exports for FilterOperator and RowFilter
+export type FilterOperator = 'not_null' | 'not_empty' | 'not_zero' | 'equals' | 'contains';
+
+export interface RowFilter {
+  columnName: string;
+  operator: FilterOperator;
+  value?: string;
+}

@@ -160,7 +160,18 @@ export const translations = {
       showFileName: 'Include File Name',
       colPosition: 'Column Position',
       posFront: 'Front',
-      posBack: 'Back'
+      posBack: 'Back',
+      // Added missing row filtering translations
+      rowFilterTitle: 'Advanced Data Cleansing',
+      rowFilterSubtitle: 'Filter rows based on specific column conditions',
+      filterCol: 'Filter Column',
+      filterRule: 'Condition',
+      filterValue: 'Comparison Value',
+      opNotNull: 'Is Not Null',
+      opNotEmpty: 'Is Not Empty',
+      opNotZero: 'Is Not Zero',
+      opEquals: 'Equals',
+      opContains: 'Contains'
     },
     config: {
       title: 'System Config',
@@ -331,7 +342,18 @@ export const translations = {
       showFileName: '输出文件名',
       colPosition: '列位置',
       posFront: '表格前方',
-      posBack: '表格后方'
+      posBack: '表格后方',
+      // Added missing row filtering translations for Chinese
+      rowFilterTitle: '高级数据清洗',
+      rowFilterSubtitle: '基于特定列条件过滤行',
+      filterCol: '过滤列',
+      filterRule: '过滤规则',
+      filterValue: '比较值',
+      opNotNull: '非空',
+      opNotEmpty: '非空字符串',
+      opNotZero: '非零',
+      opEquals: '等于',
+      opContains: '包含'
     },
     config: {
       title: '系统配置',

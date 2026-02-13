@@ -1,13 +1,36 @@
 
+import { RowFilter } from "../types";
+
 declare const XLSX: any;
 
 export interface ExcelSheetInfo {
   name: string;
-  // headers and previewRows are now optional or removed from the base metadata call
-  // to prioritize speed. We fetch them on-demand later.
   headers?: string[];
   previewRows?: any[];
 }
+
+/**
+ * Internal cache for file buffers to prevent redundant disk/memory reads.
+ */
+const bufferCache = new Map<string, ArrayBuffer>();
+
+const getFileKey = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
+
+const getFileBuffer = async (file: File): Promise<ArrayBuffer> => {
+  const key = getFileKey(file);
+  if (bufferCache.has(key)) return bufferCache.get(key)!;
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const buffer = e.target?.result as ArrayBuffer;
+      bufferCache.set(key, buffer);
+      resolve(buffer);
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+};
 
 /**
  * Utility to convert 0-based column index to Excel column name (A, B, C... Z, AA, AB...)
@@ -24,98 +47,152 @@ export const getExcelColumnName = (idx: number): string => {
 
 /**
  * Lightweight extraction of workbook metadata.
- * Strictly fetches sheet names only to ensure the UI remains responsive 
- * for large workbooks with many tabs.
  */
 export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // Only read metadata (bookSheets: true, bookProps: false etc. if supported by lib)
-        const workbook = XLSX.read(data, { type: 'array', bookSheets: true });
-        const sheets: ExcelSheetInfo[] = workbook.SheetNames.map((name: string) => ({
-          name
-        }));
-        resolve(sheets);
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
+  try {
+    const buffer = await getFileBuffer(file);
+    const workbook = XLSX.read(new Uint8Array(buffer), { 
+      type: 'array', 
+      bookSheets: true,
+      bookProps: false,
+      bookDeps: false 
+    });
+    return workbook.SheetNames.map((name: string) => ({ name }));
+  } catch (err) {
+    console.error("[ExcelService] Metadata extraction failed:", err);
+    throw err;
+  }
 };
 
 /**
- * Efficiently extracts data from a specific sheet using a limited range for configuration/preview.
- * Handles blank headers by assigning stable fallback names based on column position.
+ * Detects headers for a specific sheet at a given row index.
+ * FIX: Uses !ref range and template requirements to ensure all columns are detected, 
+ * even if the file has sparse data or blank leading headers.
+ */
+export const getSheetHeaders = async (file: File, sheetName: string, startRow: number, minCols: number = 0): Promise<string[]> => {
+  const buffer = await getFileBuffer(file);
+  const workbook = XLSX.read(new Uint8Array(buffer), { 
+    type: 'array', 
+    sheets: [sheetName],
+    sheetRows: startRow + 5 // Minimal read for header detection
+  });
+
+  if (!workbook.SheetNames.includes(sheetName)) {
+    throw new Error(`Sheet "${sheetName}" not found.`);
+  }
+
+  const worksheet = workbook.Sheets[sheetName];
+  // RECOVERY LOGIC: Use !ref to find the actual horizontal extent of the sheet
+  const ref = worksheet['!ref'] || 'A1:A1';
+  const decodedRef = XLSX.utils.decode_range(ref);
+  const fileEndCol = decodedRef.e.c;
+  
+  // Single Source of Truth for column count: max of file range and template needs
+  const maxCols = Math.max(fileEndCol + 1, minCols);
+
+  const rawRows = XLSX.utils.sheet_to_json(worksheet, { 
+    header: 1, 
+    range: startRow, 
+    defval: "" 
+  }) as any[][];
+
+  if (!rawRows || rawRows.length === 0) return Array.from({ length: maxCols }, (_, i) => `Column ${getExcelColumnName(i)}`);
+
+  const headerRow = rawRows[0] || [];
+  const headers: string[] = [];
+
+  for (let i = 0; i < maxCols; i++) {
+    const val = String(headerRow[i] || "").trim();
+    headers.push(val !== "" ? val : `Column ${getExcelColumnName(i)}`);
+  }
+  
+  return headers;
+};
+
+/**
+ * Robust data extraction with single-sheet parsing and range-limiting.
  */
 export const extractSheetData = async (
   file: File, 
   sheetName: string, 
   startRow: number,
-  endRow?: number
+  endRow?: number,
+  rowFilter?: RowFilter
 ): Promise<any[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // We only parse the specific sheet we need
-        const workbook = XLSX.read(data, { type: 'array', sheets: [sheetName] });
-        
-        let worksheet = workbook.Sheets[sheetName];
-        
-        // Fallback to first sheet if name mismatch in batch
-        if (!worksheet && workbook.SheetNames.length > 0) {
-          worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        }
-
-        if (!worksheet) throw new Error(`Sheet "${sheetName}" not found.`);
-        
-        // Read raw data as array of arrays to handle headers manually
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 1, 
-          range: startRow, 
-          defval: null 
-        }) as any[][];
-
-        if (rawRows.length === 0) return resolve([]);
-
-        const headerRow = rawRows[0] || [];
-        // Determine the actual column count based on both header and data rows
-        const maxCols = Math.max(headerRow.length, ...rawRows.slice(1, 10).map(r => r.length));
-
-        // Construct stable keys: use trimmed header text or "Column [Letter]" if blank
-        const keys: string[] = [];
-        for (let i = 0; i < maxCols; i++) {
-          const val = String(headerRow[i] || "").trim();
-          keys.push(val !== "" ? val : `Column ${getExcelColumnName(i)}`);
-        }
-
-        // Map data rows to objects using the generated keys
-        const dataRows = rawRows.slice(1);
-        const result = dataRows.map(row => {
-          const obj: any = {};
-          keys.forEach((key, i) => {
-            obj[key] = (row[i] !== undefined && row[i] !== null) ? row[i] : null;
-          });
-          return obj;
-        });
-
-        if (endRow !== undefined && endRow !== null) {
-          const limit = Math.max(0, endRow - startRow);
-          resolve(result.slice(0, limit));
-        } else {
-          resolve(result);
-        }
-      } catch (err) {
-        reject(err);
-      }
+  try {
+    const buffer = await getFileBuffer(file);
+    
+    const readOptions: any = { 
+      type: 'array', 
+      sheets: [sheetName],
+      bookProps: false,
+      bookDeps: false,
+      cellFormula: false,
+      cellHTML: false,
+      cellText: false
     };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
+
+    if (endRow !== undefined && endRow !== null) {
+      readOptions.sheetRows = endRow + 1; 
+    }
+
+    const workbook = XLSX.read(new Uint8Array(buffer), readOptions);
+    
+    if (!workbook.SheetNames.includes(sheetName)) {
+      throw new Error(`Sheet "${sheetName}" not found.`);
+    }
+
+    const worksheet = workbook.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1, 
+      range: startRow, 
+      defval: null 
+    }) as any[][];
+
+    if (rawRows.length === 0) return [];
+
+    // Unified header detection ensures keys in objects match validation keys
+    const keys = await getSheetHeaders(file, sheetName, startRow);
+
+    const dataRows = rawRows.slice(1);
+    let result = dataRows.map(row => {
+      const obj: any = {};
+      keys.forEach((key, i) => {
+        obj[key] = (row[i] !== undefined && row[i] !== null) ? row[i] : null;
+      });
+      return obj;
+    });
+
+    // Filtering logic with column safety
+    if (rowFilter && rowFilter.columnName) {
+      if (!keys.includes(rowFilter.columnName)) {
+        console.warn(`[ExcelService] RowFilter column "${rowFilter.columnName}" not found in "${file.name}". Skipping filter.`);
+      } else {
+        result = result.filter(obj => {
+          const val = obj[rowFilter.columnName];
+          const strVal = val !== null && val !== undefined ? String(val).trim() : "";
+          const numVal = Number(val);
+
+          switch (rowFilter.operator) {
+            case 'not_null': return val !== null && val !== undefined && val !== "";
+            case 'not_empty': return strVal !== "";
+            case 'not_zero': return val !== 0 && val !== "0" && !isNaN(numVal) && numVal !== 0;
+            case 'equals': return strVal === (rowFilter.value || "");
+            case 'contains': return strVal.includes(rowFilter.value || "");
+            default: return true;
+          }
+        });
+      }
+    }
+
+    if (endRow !== undefined && endRow !== null) {
+      const limit = Math.max(0, endRow - startRow);
+      result = result.slice(0, limit);
+    }
+    
+    return result;
+  } catch (err) {
+    console.error("[ExcelService] Extraction error:", err);
+    throw err;
+  }
 };
