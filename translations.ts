@@ -81,6 +81,7 @@ export const translations = {
       autoMap: 'AI Intelli-Map',
       execute: 'Execute Standard Cleansing',
       rowsProcessed: 'Total Dataset Size',
+      rowsProcessedSummary: '{0} files totaling {1} rows',
       qualityIssues: 'Data Quality Issues',
       healthScore: 'Health Score',
       export: 'Export Cleaned Data',
@@ -114,7 +115,8 @@ export const translations = {
       invalidFiles: 'Invalid Files',
       totalFiles: 'Total Files',
       noDataPreview: 'No data available to preview.',
-      unmappedFields: 'unmapped fields'
+      unmappedFields: 'unmapped fields',
+      fileNameColumn: 'File Name'
     },
     config: {
       title: 'System Config',
@@ -205,6 +207,7 @@ export const translations = {
       autoMap: 'AI 智能映射',
       execute: '执行标准清洗',
       rowsProcessed: '总数据量',
+      rowsProcessedSummary: '{0} 个文件共 {1} 行',
       qualityIssues: '数据质量问题',
       healthScore: '健康评分',
       export: '导出清洗后的数据',
@@ -238,7 +241,8 @@ export const translations = {
       invalidFiles: '架构不匹配',
       totalFiles: '文件总数',
       noDataPreview: '暂无预览数据。',
-      unmappedFields: '个未映射字段'
+      unmappedFields: '个未映射字段',
+      fileNameColumn: '文件名'
     },
     config: {
       title: '系统配置',

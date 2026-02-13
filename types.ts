@@ -43,6 +43,8 @@ export interface ValidationError {
 export interface ProcessedData {
   rows: any[];
   errors: ValidationError[];
+  fileCount: number;
+  fieldStats: Record<string, { mismatchCount: number }>;
 }
 
 export interface TransformationTemplate {

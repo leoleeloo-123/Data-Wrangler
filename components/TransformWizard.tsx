@@ -318,20 +318,31 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     try {
       const allRows: any[] = [];
       const allErrors: ValidationError[] = [];
+      const fieldStats: Record<string, { mismatchCount: number }> = {};
+      
+      // Initialize stats
+      selectedDef.fields.forEach(f => {
+        fieldStats[f.name] = { mismatchCount: 0 };
+      });
 
       for (const file of validFiles) {
         const data = await extractSheetData(file, selectedSheet, Number(startRow));
         
         data.forEach((rawRow, rowIdx) => {
-          const processedRow: any = {};
+          const processedRow: any = {
+            __source_file__: file.name,
+            __source_sheet__: selectedSheet
+          };
           
           selectedDef.fields.forEach(field => {
             const sourceColName = mapping[field.id];
             const rawValue = sourceColName ? rawRow[sourceColName] : null;
 
             let transformedValue = rawValue;
+            let hasError = false;
 
             if (field.required && (rawValue === null || rawValue === undefined || rawValue === "")) {
+              hasError = true;
               allErrors.push({
                 row: rowIdx + (Number(startRow) + 2),
                 field: field.name,
@@ -344,6 +355,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             if (field.type === FieldType.NUMBER && rawValue !== null && rawValue !== "") {
               const numValue = Number(rawValue);
               if (isNaN(numValue)) {
+                hasError = true;
                 allErrors.push({
                   row: rowIdx + (Number(startRow) + 2),
                   field: field.name,
@@ -356,6 +368,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               }
             }
 
+            if (hasError) {
+              fieldStats[field.name].mismatchCount += 1;
+            }
+
             processedRow[field.name] = transformedValue;
           });
           
@@ -363,7 +379,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         });
       }
 
-      setResults({ rows: allRows, errors: allErrors });
+      setResults({ 
+        rows: allRows, 
+        errors: allErrors, 
+        fileCount: validFiles.length,
+        fieldStats
+      });
       setStep(5); // Jump to Results
     } catch (err) {
       console.error("Transformation Error", err);
@@ -376,7 +397,13 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const handleExport = () => {
     if (!results) return;
     try {
-      const worksheet = XLSX.utils.json_to_sheet(results.rows);
+      // Create clean rows for export (remove internal metadata)
+      const cleanRows = results.rows.map(row => {
+        const { __source_file__, __source_sheet__, ...clean } = row;
+        return clean;
+      });
+      
+      const worksheet = XLSX.utils.json_to_sheet(cleanRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
       XLSX.writeFile(workbook, `${exportFileName || 'Standardized_Data'}.xlsx`);
@@ -835,18 +862,27 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 h-full">
           {/* Summary Row with Next Step button on the far right */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 items-stretch">
-            {[
-              { label: t.rowsProcessed, value: results.rows.length.toLocaleString(), unit: language === 'zh-CN' ? '行' : 'Rows', color: 'slate' },
-              { label: t.qualityIssues, value: results.errors.length.toLocaleString(), unit: '', color: results.errors.length > 0 ? 'red' : 'emerald' },
-              { label: t.healthScore, value: `${Math.max(0, 100 - (results.errors.length / (results.rows.length * (selectedDef?.fields.length || 1)) * 100)).toFixed(1)}%`, unit: '', color: 'indigo' }
-            ].map((stat, i) => (
-              <div key={i} className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
-                <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{stat.label}</p>
-                <h3 className={`text-5xl font-black tracking-tight ${stat.color === 'red' ? 'text-red-500' : stat.color === 'emerald' ? 'text-emerald-500' : stat.color === 'indigo' ? 'text-indigo-600' : 'text-slate-800'}`}>
-                  {stat.value} <span className="text-xl font-bold text-slate-300 ml-1">{stat.unit}</span>
-                </h3>
-              </div>
-            ))}
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.rowsProcessed}</p>
+              <h3 className={`text-3xl font-black tracking-tight text-slate-800`}>
+                {t.rowsProcessedSummary.replace('{0}', results.fileCount.toString()).replace('{1}', results.rows.length.toLocaleString())}
+              </h3>
+            </div>
+            
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-red-400 transition-colors">{t.qualityIssues}</p>
+              <h3 className={`text-5xl font-black tracking-tight ${results.errors.length > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {results.errors.length.toLocaleString()}
+              </h3>
+            </div>
+
+            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.healthScore}</p>
+              <h3 className={`text-5xl font-black tracking-tight text-indigo-600`}>
+                {Math.max(0, 100 - (results.errors.length / (results.rows.length * (selectedDef?.fields.length || 1)) * 100)).toFixed(1)}%
+              </h3>
+            </div>
+
             {/* Rapid Workflow Access: Next step on the same row */}
             <button 
               onClick={() => setStep(6)}
@@ -872,14 +908,32 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                       <thead className="bg-slate-50 sticky top-0 z-10 border-b-2 border-slate-100">
                         <tr>
                           <th className="px-8 py-6 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-r border-slate-100 w-16 text-center">#</th>
-                          {selectedDef?.fields.map(f => <th key={f.id} className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">{f.name}</th>)}
+                          <th className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest bg-slate-50 border-r border-slate-100 min-w-[200px]">{t.fileNameColumn}</th>
+                          {selectedDef?.fields.map(f => {
+                            const stats = results.fieldStats[f.name];
+                            return (
+                              <th key={f.id} className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">
+                                {f.name} 
+                                <span className={`ml-2 text-[10px] font-black px-2 py-0.5 rounded-full ${stats.mismatchCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                                  ({f.type} | {stats.mismatchCount})
+                                </span>
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
                         {results.rows.slice(0, 100).map((row, i) => (
                           <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-8 py-4 text-slate-300 font-black bg-slate-50/30 text-center border-r border-slate-50">{i + 1}</td>
-                            {selectedDef?.fields.map(f => <td key={f.id} className="px-8 py-4 text-slate-600 whitespace-nowrap">{row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-200 font-black italic">NULL</span>}</td>)}
+                            <td className="px-8 py-4 text-slate-400 font-black italic border-r border-slate-50">
+                              {row.__source_file__}_{row.__source_sheet__}
+                            </td>
+                            {selectedDef?.fields.map(f => (
+                              <td key={f.id} className="px-8 py-4 text-slate-600 whitespace-nowrap">
+                                {row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-200 font-black italic">NULL</span>}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
