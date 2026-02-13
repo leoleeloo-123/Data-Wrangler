@@ -5,11 +5,11 @@ import {
   LayoutDashboard, 
   Settings, 
   FileUp, 
-  History, 
   ChevronRight, 
   Database,
   Building2,
-  Layers
+  Layers,
+  ClipboardCheck
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -28,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
     { id: 'definitions', label: t.sidebar.definitions, icon: Database },
     { id: 'import', label: t.sidebar.transform, icon: FileUp },
     { id: 'batch', label: t.sidebar.batch, icon: Layers },
-    { id: 'history', label: t.sidebar.history, icon: History },
+    { id: 'review', label: t.sidebar.review, icon: ClipboardCheck },
   ];
 
   return (
@@ -50,14 +50,14 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 ${
                   isActive 
-                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-medium' 
+                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-black' 
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                {item.label}
+                <Icon className={`w-6 h-6 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <span className="text-base">{item.label}</span>
                 {isActive && <ChevronRight className="w-4 h-4 ml-auto opacity-50" />}
               </button>
             );
@@ -67,10 +67,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
         <div className="p-4 mt-auto border-t border-slate-100">
           <button 
             onClick={onOpenConfig}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors"
           >
-            <Settings className="w-5 h-5 text-slate-400" />
-            {t.sidebar.config}
+            <Settings className="w-6 h-6 text-slate-400" />
+            <span className="text-base font-medium">{t.sidebar.config}</span>
           </button>
         </div>
       </aside>

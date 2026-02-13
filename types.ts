@@ -88,3 +88,17 @@ export interface BatchConfiguration {
   globalFileName?: string;
   globalSheetName?: string;
 }
+
+export interface DataReviewEntry {
+  id: string;
+  batchName: string;
+  timestamp: string;
+  strategy: 'multi-sheet' | 'consolidated';
+  tasks: {
+    modelName: string;
+    rowCount: number;
+    sheetName: string;
+    fileName: string;
+    rows: any[];
+  }[];
+}

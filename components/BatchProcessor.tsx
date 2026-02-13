@@ -22,9 +22,10 @@ import {
   Edit2,
   Upload as UploadIcon,
   TableProperties,
-  FileDown
+  FileDown,
+  ClipboardCheck
 } from 'lucide-react';
-import { DataDefinition, TransformationTemplate, BatchConfiguration, BatchTask, ProcessedData, ValidationError, FieldType } from '../types';
+import { DataDefinition, TransformationTemplate, BatchConfiguration, BatchTask, ProcessedData, ValidationError, FieldType, DataReviewEntry } from '../types';
 import { translations } from '../translations';
 import { extractSheetData } from '../services/excelService';
 
@@ -36,6 +37,7 @@ interface BatchProcessorProps {
   batches: BatchConfiguration[];
   onSaveBatch: (batch: BatchConfiguration) => void;
   onDeleteBatch: (id: string) => void;
+  onExportToReview: (entry: DataReviewEntry) => void;
   language: 'en-US' | 'zh-CN';
 }
 
@@ -45,6 +47,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
   batches,
   onSaveBatch,
   onDeleteBatch,
+  onExportToReview,
   language 
 }) => {
   const t = translations[language];
@@ -290,11 +293,62 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
     }
   };
 
+  const getCleanRowsForTask = (task: BatchTask, template: TransformationTemplate, def: DataDefinition) => {
+     if (!task.results) return [];
+     return task.results.rows.map(row => {
+        const { __source_file__, __source_sheet__, ...dataFields } = row;
+        const fileNameHeader = translations[language].transform.fileNameColumn;
+        const infoStr = `${__source_file__}_${__source_sheet__}`;
+        
+        const orderedRow: any = {};
+        if (template.includeFileName && template.fileNamePosition === 'front') {
+          orderedRow[fileNameHeader] = infoStr;
+        }
+        def.fields.forEach(f => {
+          orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
+        });
+        if (template.includeFileName && template.fileNamePosition === 'back') {
+          orderedRow[fileNameHeader] = infoStr;
+        }
+        return orderedRow;
+      });
+  };
+
+  const exportToReview = () => {
+    if (!currentBatch) return;
+    const tasksForReview = currentBatch.tasks.filter(t => t.status === 'completed').map(task => {
+        const template = templates.find(tpl => tpl.id === task.templateId)!;
+        const def = definitions.find(d => d.id === template.definitionId)!;
+        return {
+           modelName: template.name,
+           rowCount: task.results?.rows.length || 0,
+           sheetName: task.customOutputSheetName,
+           fileName: task.customOutputFileName,
+           rows: getCleanRowsForTask(task, template, def)
+        };
+    });
+
+    if (tasksForReview.length === 0) {
+      alert(language === 'zh-CN' ? '没有已完成的任务可供复核。' : 'No completed tasks available for review.');
+      return;
+    }
+
+    const reviewEntry: DataReviewEntry = {
+       id: crypto.randomUUID(),
+       batchName: currentBatch.name || 'Unnamed Batch',
+       timestamp: new Date().toISOString(),
+       strategy: currentBatch.exportStrategy,
+       tasks: tasksForReview
+    };
+
+    onExportToReview(reviewEntry);
+    alert(language === 'zh-CN' ? '已成功导出到数据复核！' : 'Successfully exported to Data Review!');
+  };
+
   const exportBatch = () => {
     if (!currentBatch) return;
 
     if (currentBatch.exportStrategy === 'multi-sheet') {
-      // Logic: Split Files - Export one Excel per model, each using global sheet name
       currentBatch.tasks.forEach(task => {
         const template = templates.find(tpl => tpl.id === task.templateId);
         const def = definitions.find(d => d.id === template?.definitionId);
@@ -304,24 +358,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
           const unifiedSheetName = (currentBatch.globalSheetName || 'Sheet1').substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '_');
           const outputFileName = (task.customOutputFileName || 'Task_Output').replace(/[\[\]\*\?\/\\]/g, '_');
           
-          const cleanRows = task.results.rows.map(row => {
-            const { __source_file__, __source_sheet__, ...dataFields } = row;
-            const fileNameHeader = translations[language].transform.fileNameColumn;
-            const infoStr = `${__source_file__}_${__source_sheet__}`;
-            
-            const orderedRow: any = {};
-            // Strict ordering based on template settings
-            if (template.includeFileName && template.fileNamePosition === 'front') {
-              orderedRow[fileNameHeader] = infoStr;
-            }
-            def.fields.forEach(f => {
-              orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
-            });
-            if (template.includeFileName && template.fileNamePosition === 'back') {
-              orderedRow[fileNameHeader] = infoStr;
-            }
-            return orderedRow;
-          });
+          const cleanRows = getCleanRowsForTask(task, template, def);
 
           const ws = XLSX.utils.json_to_sheet(cleanRows);
           XLSX.utils.book_append_sheet(wb, ws, unifiedSheetName);
@@ -329,7 +366,6 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
         }
       });
     } else {
-      // Logic: Unified File - Export one single Excel based on global file name, each task is a separate named sheet
       const wb = XLSX.utils.book_new();
       const outputFileName = (currentBatch.globalFileName || 'Consolidated_Batch').replace(/[\[\]\*\?\/\\]/g, '_');
       
@@ -339,25 +375,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
         if (task.results && task.results.rows.length > 0 && template && def) {
           const taskSheetName = (task.customOutputSheetName || 'Model_Sheet').substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '_');
-          
-          const cleanRows = task.results.rows.map(row => {
-            const { __source_file__, __source_sheet__, ...dataFields } = row;
-            const fileNameHeader = translations[language].transform.fileNameColumn;
-            const infoStr = `${__source_file__}_${__source_sheet__}`;
-            
-            const orderedRow: any = {};
-            // Strict ordering based on template settings
-            if (template.includeFileName && template.fileNamePosition === 'front') {
-              orderedRow[fileNameHeader] = infoStr;
-            }
-            def.fields.forEach(f => {
-              orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
-            });
-            if (template.includeFileName && template.fileNamePosition === 'back') {
-              orderedRow[fileNameHeader] = infoStr;
-            }
-            return orderedRow;
-          });
+          const cleanRows = getCleanRowsForTask(task, template, def);
 
           const ws = XLSX.utils.json_to_sheet(cleanRows);
           XLSX.utils.book_append_sheet(wb, ws, taskSheetName);
@@ -522,7 +540,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
                   <h3 className="text-3xl font-black text-slate-800 flex items-center gap-4 tracking-tight"><CheckCircle2 className="w-10 h-10 text-indigo-500" />{bt.tasks}</h3>
                   <div className="flex gap-4">
                      <button onClick={() => { if(currentBatch) onSaveBatch(currentBatch); setIsCreating(false); }} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-3xl font-black text-xs uppercase tracking-widest hover:border-indigo-600 hover:text-indigo-600 transition-all">{t.definitions.cancel}</button>
-                     <button onClick={runBatch} disabled={isProcessing || currentBatch?.tasks.length === 0} className="px-10 py-4 bg-indigo-600 text-white rounded-3xl font-black text-xs uppercase tracking-[.2em] shadow-2xl shadow-indigo-200 flex items-center gap-3 hover:bg-indigo-700 transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">{isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}{bt.run}</button>
+                     <button onClick={runBatch} disabled={isProcessing || currentBatch?.tasks.length === 0} className="px-10 py-4 bg-indigo-600 text-white rounded-3xl font-black text-xs uppercase tracking-[.2em] shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">{isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}{bt.run}</button>
                   </div>
                </div>
 
@@ -675,13 +693,22 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
                         <p className="text-xs text-slate-500 font-bold mt-1">Ready for unified generation.</p>
                      </div>
                   </div>
-                  <button 
-                    disabled={!currentBatch?.tasks.every(t => t.status === 'completed') || currentBatch.tasks.length === 0}
-                    onClick={exportBatch}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-6 rounded-[32px] font-black flex items-center justify-center gap-4 shadow-2xl shadow-emerald-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg uppercase tracking-widest disabled:transform-none disabled:opacity-50"
-                  >
-                    <Download className="w-6 h-6" /> {bt.export}
-                  </button>
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <button 
+                      disabled={!currentBatch?.tasks.every(t => t.status === 'completed') || currentBatch.tasks.length === 0}
+                      onClick={exportBatch}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-6 rounded-[32px] font-black flex items-center justify-center gap-3 shadow-2xl shadow-emerald-100 transition-all transform hover:-translate-y-1 active:scale-95 text-sm uppercase tracking-widest disabled:transform-none disabled:opacity-50"
+                    >
+                      <Download className="w-5 h-5" /> {bt.export}
+                    </button>
+                    <button 
+                      disabled={!currentBatch?.tasks.some(t => t.status === 'completed')}
+                      onClick={exportToReview}
+                      className="flex-1 bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-6 rounded-[32px] font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-50 transition-all transform hover:-translate-y-1 active:scale-95 text-sm uppercase tracking-widest disabled:transform-none disabled:opacity-50"
+                    >
+                      <ClipboardCheck className="w-5 h-5" /> {bt.exportReview}
+                    </button>
+                  </div>
                </div>
             </div>
           </div>

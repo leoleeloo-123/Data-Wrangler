@@ -4,7 +4,8 @@ import Layout from './components/Layout';
 import DefinitionManager from './components/DefinitionManager';
 import TransformWizard from './components/TransformWizard';
 import BatchProcessor from './components/BatchProcessor';
-import { DataDefinition, FieldType, TransformationTemplate, BatchConfiguration, BatchTask } from './types';
+import DataReview from './components/DataReview';
+import { DataDefinition, FieldType, TransformationTemplate, BatchConfiguration, BatchTask, DataReviewEntry } from './types';
 import { translations } from './translations';
 import { 
   CheckCircle2, 
@@ -24,7 +25,8 @@ import {
   FileJson,
   PlusCircle,
   User as UserIcon,
-  Building as BuildingIcon
+  Building as BuildingIcon,
+  ClipboardCheck
 } from 'lucide-react';
 
 declare const XLSX: any;
@@ -34,6 +36,7 @@ const App: React.FC = () => {
   const [definitions, setDefinitions] = useState<DataDefinition[]>([]);
   const [templates, setTemplates] = useState<TransformationTemplate[]>([]);
   const [batches, setBatches] = useState<BatchConfiguration[]>([]);
+  const [reviewEntries, setReviewEntries] = useState<DataReviewEntry[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
@@ -90,6 +93,11 @@ const App: React.FC = () => {
       const savedBatches = localStorage.getItem('tax-batch-configs');
       if (savedBatches) {
         setBatches(JSON.parse(savedBatches));
+      }
+
+      const savedReviews = localStorage.getItem('tax-review-entries');
+      if (savedReviews) {
+        setReviewEntries(JSON.parse(savedReviews));
       }
     } catch (e) {
       console.error("Failed to initialize data from localStorage", e);
@@ -150,6 +158,18 @@ const App: React.FC = () => {
     localStorage.setItem('tax-batch-configs', JSON.stringify(updated));
   };
 
+  const addReviewEntry = (entry: DataReviewEntry) => {
+    const updated = [entry, ...reviewEntries];
+    setReviewEntries(updated);
+    localStorage.setItem('tax-review-entries', JSON.stringify(updated));
+  };
+
+  const deleteReviewEntry = (id: string) => {
+    const updated = reviewEntries.filter(e => e.id !== id);
+    setReviewEntries(updated);
+    localStorage.setItem('tax-review-entries', JSON.stringify(updated));
+  };
+
   // Export Logic
   const exportConfig = () => {
     const wb = XLSX.utils.book_new();
@@ -194,19 +214,16 @@ const App: React.FC = () => {
       globalFileName: b.globalFileName || '',
       globalSheetName: b.globalSheetName || '',
       tasks: JSON.stringify(b.tasks.map(task => {
-        // We do NOT export actual File objects or processing results (rows)
-        // because they are large and file references become stale.
         const { files, results, validationResults, ...rest } = task;
         return {
           ...rest,
-          status: 'pending' // Reset status on export/import
+          status: 'pending' 
         };
       }))
     }));
     const batchSheet = XLSX.utils.json_to_sheet(batchData);
     XLSX.utils.book_append_sheet(wb, batchSheet, "Batches");
 
-    // Format filename: TaxStandard_Config_CompanyName_UserName_DateTime
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
@@ -273,7 +290,6 @@ const App: React.FC = () => {
           localStorage.setItem('tax-transformation-templates', JSON.stringify(newTemplates));
           localStorage.setItem('tax-batch-configs', JSON.stringify(newBatches));
         } else {
-          // Merge strategy (Upsert)
           const mergedDefs = [...definitions];
           newDefs.forEach(nd => {
             const idx = mergedDefs.findIndex(d => d.id === nd.id);
@@ -337,23 +353,16 @@ const App: React.FC = () => {
             onSaveBatch={saveBatch}
             batches={batches}
             onDeleteBatch={deleteBatch}
+            onExportToReview={addReviewEntry}
           />
         );
-      case 'history':
+      case 'review':
         return (
-          <div className="p-12 max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4">
-            <header>
-              <h1 className="text-5xl font-black text-slate-800 tracking-tighter">{t.sidebar.history}</h1>
-              <p className="text-slate-500 font-bold mt-2 text-lg">Detailed logs of all standard cleansing and batch transformation activities.</p>
-            </header>
-            <div className="bg-white rounded-[48px] border border-slate-200 overflow-hidden shadow-sm">
-              <div className="p-32 text-center text-slate-400">
-                <Clock className="w-24 h-24 mx-auto mb-8 opacity-10" />
-                <p className="text-2xl font-black text-slate-300">No archival logs found.</p>
-                <p className="mt-4 font-bold text-slate-400">Completed transformation tasks and export history will appear here.</p>
-              </div>
-            </div>
-          </div>
+          <DataReview 
+            entries={reviewEntries}
+            onDeleteEntry={deleteReviewEntry}
+            language={language}
+          />
         );
       case 'dashboard':
       default:
@@ -467,11 +476,11 @@ const App: React.FC = () => {
                       {t.dashboard.newBatch}
                     </button>
                     <button 
-                      onClick={() => setActiveTab('definitions')}
+                      onClick={() => setActiveTab('review')}
                       className="w-full bg-white border-2 border-slate-200 hover:border-indigo-200 text-slate-600 font-black py-6 rounded-[32px] transition-all flex items-center justify-center gap-3 text-lg"
                     >
-                      <Database className="w-6 h-6" />
-                      {t.dashboard.manageModules}
+                      <ClipboardCheck className="w-6 h-6" />
+                      {language === 'zh-CN' ? 'Data Review' : 'Review Results'}
                     </button>
                   </div>
                 </div>

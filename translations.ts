@@ -6,7 +6,7 @@ export const translations = {
       definitions: 'Definitions',
       transform: 'Transform Data',
       batch: 'Batch Process',
-      history: 'Processing History',
+      review: 'Data Review',
       config: 'System Config',
     },
     dashboard: {
@@ -59,6 +59,7 @@ export const translations = {
       running: 'Orchestrating batch execution...',
       success: 'Batch processed successfully.',
       export: 'Export Batch Results',
+      exportReview: 'Send to Review',
       ready: 'Ready for processing',
       processing: 'Processing...',
       completed: 'Completed',
@@ -170,7 +171,7 @@ export const translations = {
       definitions: '数据定义',
       transform: '数据转换',
       batch: '批量处理',
-      history: '处理历史',
+      review: '数据复核',
       config: '系统配置',
     },
     dashboard: {
@@ -223,6 +224,7 @@ export const translations = {
       running: '正在编排执行批处理任务...',
       success: '批处理执行成功。',
       export: '导出批处理结果',
+      exportReview: '导出到数据复核',
       ready: '等待处理',
       processing: '处理中...',
       completed: '已完成',
