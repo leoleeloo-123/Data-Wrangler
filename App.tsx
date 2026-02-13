@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import DefinitionManager from './components/DefinitionManager';
 import TransformWizard from './components/TransformWizard';
-import { DataDefinition, FieldType, TransformationTemplate } from './types';
+import BatchProcessor from './components/BatchProcessor';
+import { DataDefinition, FieldType, TransformationTemplate, BatchConfiguration, BatchTask } from './types';
 import { translations } from './translations';
 import { 
   CheckCircle2, 
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [definitions, setDefinitions] = useState<DataDefinition[]>([]);
   const [templates, setTemplates] = useState<TransformationTemplate[]>([]);
+  const [batches, setBatches] = useState<BatchConfiguration[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
@@ -84,6 +86,11 @@ const App: React.FC = () => {
       if (savedTemplates) {
         setTemplates(JSON.parse(savedTemplates));
       }
+
+      const savedBatches = localStorage.getItem('tax-batch-configs');
+      if (savedBatches) {
+        setBatches(JSON.parse(savedBatches));
+      }
     } catch (e) {
       console.error("Failed to initialize data from localStorage", e);
     }
@@ -125,6 +132,24 @@ const App: React.FC = () => {
     localStorage.setItem('tax-transformation-templates', JSON.stringify(updated));
   };
 
+  const saveBatch = (batch: BatchConfiguration) => {
+    const exists = batches.find(b => b.id === batch.id);
+    let updated;
+    if (exists) {
+      updated = batches.map(b => b.id === batch.id ? batch : b);
+    } else {
+      updated = [...batches, batch];
+    }
+    setBatches(updated);
+    localStorage.setItem('tax-batch-configs', JSON.stringify(updated));
+  };
+
+  const deleteBatch = (id: string) => {
+    const updated = batches.filter(b => b.id !== id);
+    setBatches(updated);
+    localStorage.setItem('tax-batch-configs', JSON.stringify(updated));
+  };
+
   // Export Logic
   const exportConfig = () => {
     const wb = XLSX.utils.book_new();
@@ -158,6 +183,28 @@ const App: React.FC = () => {
     }));
     const templateSheet = XLSX.utils.json_to_sheet(templateData);
     XLSX.utils.book_append_sheet(wb, templateSheet, "Templates");
+
+    // Process Batches
+    const batchData = batches.map(b => ({
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      createdAt: b.createdAt,
+      exportStrategy: b.exportStrategy,
+      globalFileName: b.globalFileName || '',
+      globalSheetName: b.globalSheetName || '',
+      tasks: JSON.stringify(b.tasks.map(task => {
+        // We do NOT export actual File objects or processing results (rows)
+        // because they are large and file references become stale.
+        const { files, results, validationResults, ...rest } = task;
+        return {
+          ...rest,
+          status: 'pending' // Reset status on export/import
+        };
+      }))
+    }));
+    const batchSheet = XLSX.utils.json_to_sheet(batchData);
+    XLSX.utils.book_append_sheet(wb, batchSheet, "Batches");
 
     // Format filename: TaxStandard_Config_CompanyName_UserName_DateTime
     const now = new Date();
@@ -203,11 +250,28 @@ const App: React.FC = () => {
           }));
         }
 
+        // Parse Batches
+        const batchSheet = workbook.Sheets["Batches"];
+        let newBatches: BatchConfiguration[] = [];
+        if (batchSheet) {
+          const raw = XLSX.utils.sheet_to_json(batchSheet);
+          newBatches = raw.map((r: any) => ({
+            ...r,
+            tasks: typeof r.tasks === 'string' ? JSON.parse(r.tasks).map((t: any) => ({
+              ...t,
+              files: [],
+              status: 'pending'
+            })) : []
+          }));
+        }
+
         if (strategy === 'replace') {
           setDefinitions(newDefs);
           setTemplates(newTemplates);
+          setBatches(newBatches);
           localStorage.setItem('tax-definitions', JSON.stringify(newDefs));
           localStorage.setItem('tax-transformation-templates', JSON.stringify(newTemplates));
+          localStorage.setItem('tax-batch-configs', JSON.stringify(newBatches));
         } else {
           // Merge strategy (Upsert)
           const mergedDefs = [...definitions];
@@ -224,10 +288,19 @@ const App: React.FC = () => {
             else mergedTemplates.push(nt);
           });
 
+          const mergedBatches = [...batches];
+          newBatches.forEach(nb => {
+            const idx = mergedBatches.findIndex(b => b.id === nb.id);
+            if (idx > -1) mergedBatches[idx] = nb;
+            else mergedBatches.push(nb);
+          });
+
           setDefinitions(mergedDefs);
           setTemplates(mergedTemplates);
+          setBatches(mergedBatches);
           localStorage.setItem('tax-definitions', JSON.stringify(mergedDefs));
           localStorage.setItem('tax-transformation-templates', JSON.stringify(mergedTemplates));
+          localStorage.setItem('tax-batch-configs', JSON.stringify(mergedBatches));
         }
 
         setIsImportOpen(false);
@@ -253,6 +326,17 @@ const App: React.FC = () => {
             onSaveTemplate={saveTemplate} 
             onDeleteTemplate={deleteTemplate}
             language={language} 
+          />
+        );
+      case 'batch':
+        return (
+          <BatchProcessor 
+            templates={templates} 
+            definitions={definitions}
+            language={language}
+            onSaveBatch={saveBatch}
+            batches={batches}
+            onDeleteBatch={deleteBatch}
           />
         );
       case 'history':

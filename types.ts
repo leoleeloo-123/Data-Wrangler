@@ -62,3 +62,29 @@ export interface TransformationTemplate {
   includeFileName: boolean;
   fileNamePosition: 'front' | 'back';
 }
+
+export interface BatchTask {
+  id: string;
+  templateId: string;
+  files: File[];
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  results?: ProcessedData;
+  customOutputSheetName: string;
+  customOutputFileName: string;
+  validationResults?: {
+    fileName: string;
+    isValid: boolean;
+    error?: string;
+  }[];
+}
+
+export interface BatchConfiguration {
+  id: string;
+  name: string;
+  description: string;
+  tasks: BatchTask[];
+  createdAt: string;
+  exportStrategy: 'multi-sheet' | 'consolidated';
+  globalFileName?: string;
+  globalSheetName?: string;
+}

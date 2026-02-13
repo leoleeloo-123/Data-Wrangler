@@ -8,7 +8,8 @@ import {
   History, 
   ChevronRight, 
   Database,
-  Building2
+  Building2,
+  Layers
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -26,6 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
     { id: 'dashboard', label: t.sidebar.dashboard, icon: LayoutDashboard },
     { id: 'definitions', label: t.sidebar.definitions, icon: Database },
     { id: 'import', label: t.sidebar.transform, icon: FileUp },
+    { id: 'batch', label: t.sidebar.batch, icon: Layers },
     { id: 'history', label: t.sidebar.history, icon: History },
   ];
 

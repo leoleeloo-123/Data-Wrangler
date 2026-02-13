@@ -46,8 +46,17 @@ export const extractSheetData = async (
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
-        const worksheet = workbook.Sheets[sheetName];
-        if (!worksheet) throw new Error(`Sheet ${sheetName} not found`);
+        
+        // Attempt to find worksheet by name
+        let worksheet = workbook.Sheets[sheetName];
+        
+        // Robustness: If specified sheet name isn't found, try falling back to the first sheet
+        if (!worksheet && workbook.SheetNames.length > 0) {
+          console.warn(`Sheet "${sheetName}" not found in file "${file.name}". Using first sheet: "${workbook.SheetNames[0]}"`);
+          worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
+
+        if (!worksheet) throw new Error(`Sheet "${sheetName}" not found and no alternative sheets available.`);
         
         // Convert to JSON starting from startRow (0-indexed)
         const json = XLSX.utils.sheet_to_json(worksheet, { 
@@ -56,10 +65,6 @@ export const extractSheetData = async (
         }) as any[];
 
         // If endRow is specified, slice the array.
-        // startRow is where headers are. Data starts at startRow + 1.
-        // If startRow = 2 (Excel Row 3), headers are at index 2.
-        // sheet_to_json with range: 2 returns objects starting from Row 4 (index 3).
-        // If endRow = 30, we want to stop after index 30 in the sheet.
         if (endRow !== undefined && endRow !== null) {
           const limit = Math.max(0, endRow - startRow);
           resolve(json.slice(0, limit));
