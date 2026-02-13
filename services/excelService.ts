@@ -46,16 +46,22 @@ export const getExcelColumnName = (idx: number): string => {
 };
 
 /**
- * Lightweight extraction of workbook metadata.
+ * Lightweight extraction of workbook metadata (Sheet names only).
+ * Targeted to be near-instant even for 50MB+ files.
  */
 export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> => {
   try {
     const buffer = await getFileBuffer(file);
+    // CRITICAL: We only read the sheet names, skipping all cell content
     const workbook = XLSX.read(new Uint8Array(buffer), { 
       type: 'array', 
       bookSheets: true,
       bookProps: false,
-      bookDeps: false 
+      bookDeps: false,
+      cellFormula: false,
+      cellHTML: false,
+      cellText: false,
+      cellStyles: false
     });
     return workbook.SheetNames.map((name: string) => ({ name }));
   } catch (err) {
@@ -66,15 +72,18 @@ export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> 
 
 /**
  * Detects headers for a specific sheet at a given row index.
- * FIX: Uses !ref range and template requirements to ensure all columns are detected, 
- * even if the file has sparse data or blank leading headers.
+ * Uses range-limiting to avoid parsing the entire sheet.
  */
 export const getSheetHeaders = async (file: File, sheetName: string, startRow: number, minCols: number = 0): Promise<string[]> => {
   const buffer = await getFileBuffer(file);
+  
+  // Only parse the specific sheet and only enough rows to find the header
   const workbook = XLSX.read(new Uint8Array(buffer), { 
     type: 'array', 
     sheets: [sheetName],
-    sheetRows: startRow + 5 // Minimal read for header detection
+    sheetRows: startRow + 5, // Minimal read
+    bookProps: false,
+    bookDeps: false
   });
 
   if (!workbook.SheetNames.includes(sheetName)) {
@@ -82,12 +91,10 @@ export const getSheetHeaders = async (file: File, sheetName: string, startRow: n
   }
 
   const worksheet = workbook.Sheets[sheetName];
-  // RECOVERY LOGIC: Use !ref to find the actual horizontal extent of the sheet
   const ref = worksheet['!ref'] || 'A1:A1';
   const decodedRef = XLSX.utils.decode_range(ref);
   const fileEndCol = decodedRef.e.c;
   
-  // Single Source of Truth for column count: max of file range and template needs
   const maxCols = Math.max(fileEndCol + 1, minCols);
 
   const rawRows = XLSX.utils.sheet_to_json(worksheet, { 
@@ -122,6 +129,7 @@ export const extractSheetData = async (
   try {
     const buffer = await getFileBuffer(file);
     
+    // Performance: Explicitly request ONLY the sheet we need
     const readOptions: any = { 
       type: 'array', 
       sheets: [sheetName],
@@ -129,7 +137,8 @@ export const extractSheetData = async (
       bookDeps: false,
       cellFormula: false,
       cellHTML: false,
-      cellText: false
+      cellText: false,
+      cellStyles: false
     };
 
     if (endRow !== undefined && endRow !== null) {
@@ -139,7 +148,7 @@ export const extractSheetData = async (
     const workbook = XLSX.read(new Uint8Array(buffer), readOptions);
     
     if (!workbook.SheetNames.includes(sheetName)) {
-      throw new Error(`Sheet "${sheetName}" not found.`);
+      throw new Error(`Sheet "${sheetName}" not found in file.`);
     }
 
     const worksheet = workbook.Sheets[sheetName];
@@ -151,7 +160,6 @@ export const extractSheetData = async (
 
     if (rawRows.length === 0) return [];
 
-    // Unified header detection ensures keys in objects match validation keys
     const keys = await getSheetHeaders(file, sheetName, startRow);
 
     const dataRows = rawRows.slice(1);
@@ -163,26 +171,21 @@ export const extractSheetData = async (
       return obj;
     });
 
-    // Filtering logic with column safety
     if (rowFilter && rowFilter.columnName) {
-      if (!keys.includes(rowFilter.columnName)) {
-        console.warn(`[ExcelService] RowFilter column "${rowFilter.columnName}" not found in "${file.name}". Skipping filter.`);
-      } else {
-        result = result.filter(obj => {
-          const val = obj[rowFilter.columnName];
-          const strVal = val !== null && val !== undefined ? String(val).trim() : "";
-          const numVal = Number(val);
+      result = result.filter(obj => {
+        const val = obj[rowFilter.columnName];
+        const strVal = val !== null && val !== undefined ? String(val).trim() : "";
+        const numVal = Number(val);
 
-          switch (rowFilter.operator) {
-            case 'not_null': return val !== null && val !== undefined && val !== "";
-            case 'not_empty': return strVal !== "";
-            case 'not_zero': return val !== 0 && val !== "0" && !isNaN(numVal) && numVal !== 0;
-            case 'equals': return strVal === (rowFilter.value || "");
-            case 'contains': return strVal.includes(rowFilter.value || "");
-            default: return true;
-          }
-        });
-      }
+        switch (rowFilter.operator) {
+          case 'not_null': return val !== null && val !== undefined && val !== "";
+          case 'not_empty': return strVal !== "";
+          case 'not_zero': return val !== 0 && val !== "0" && !isNaN(numVal) && numVal !== 0;
+          case 'equals': return strVal === (rowFilter.value || "");
+          case 'contains': return strVal.includes(rowFilter.value || "");
+          default: return true;
+        }
+      });
     }
 
     if (endRow !== undefined && endRow !== null) {

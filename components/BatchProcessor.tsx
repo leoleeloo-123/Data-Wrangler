@@ -27,10 +27,12 @@ import {
 } from 'lucide-react';
 import { DataDefinition, TransformationTemplate, BatchConfiguration, BatchTask, ProcessedData, ValidationError, FieldType, DataReviewEntry } from '../types';
 import { translations } from '../translations';
-import { extractSheetData } from '../services/excelService';
+import { extractSheetData, getSheetHeaders } from '../services/excelService';
 
+// Fix: Declare global XLSX variable to resolve 'Cannot find name XLSX' errors
 declare const XLSX: any;
 
+// Fix: Define missing BatchProcessorProps interface to resolve 'Cannot find name BatchProcessorProps' error
 interface BatchProcessorProps {
   templates: TransformationTemplate[];
   definitions: DataDefinition[];
@@ -101,52 +103,37 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
   };
 
   const validateFileForTask = async (file: File, template: TransformationTemplate): Promise<{fileName: string, isValid: boolean, error?: string}> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          let worksheet = workbook.Sheets[template.sheetName];
-          if (!worksheet && workbook.SheetNames.length > 0) {
-            worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          }
+    try {
+      // UNIFIED PARSING: Use getSheetHeaders with minCols hint from template
+      const fileHeaders = await getSheetHeaders(file, template.sheetName, template.startRow, (template.expectedHeaders || []).length);
+      
+      const missing = (template.expectedHeaders || []).filter(h => !fileHeaders.includes(h));
+      
+      if (missing.length > 0) {
+        // Log validation info consistent with Wizard for troubleshooting
+        console.warn(`[Batch Validation Failed] File: ${file.name}\nSheet: ${template.sheetName}\nTemplate Headers: ${template.expectedHeaders.length}\nFile Headers Found: ${fileHeaders.length}\nMissing:`, missing.slice(0, 20));
+        
+        return { 
+          fileName: file.name, 
+          isValid: false, 
+          error: language === 'zh-CN' ? `缺失列 (检测到 ${fileHeaders.length} 列): ${missing.slice(0, 3).join(', ')}...` : `Missing columns (found ${fileHeaders.length}): ${missing.slice(0, 3).join(', ')}...` 
+        };
+      }
 
-          if (!worksheet) {
-            return resolve({ fileName: file.name, isValid: false, error: 'Target sheet not found' });
-          }
-
-          const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
-            header: 1, 
-            range: template.startRow, 
-            defval: "" 
-          }) as any[][];
-
-          const fileHeaders = (headerRows[0] || []).map(h => String(h).trim()).filter(h => h !== "");
-          const missing = (template.expectedHeaders || []).filter(h => !fileHeaders.includes(h));
-          
-          if (missing.length > 0) {
-            return resolve({ 
-              fileName: file.name, 
-              isValid: false, 
-              error: language === 'zh-CN' ? `缺失列: ${missing.join(', ')}` : `Missing columns: ${missing.join(', ')}` 
-            });
-          }
-
-          resolve({ fileName: file.name, isValid: true });
-        } catch (err) {
-          resolve({ fileName: file.name, isValid: false, error: 'Parse Error' });
-        }
+      return { fileName: file.name, isValid: true };
+    } catch (err: any) {
+      console.error(`[Batch] Validation failed for ${file.name}:`, err);
+      return { 
+        fileName: file.name, 
+        isValid: false, 
+        error: err.message || 'File validation error' 
       };
-      reader.readAsArrayBuffer(file);
-    });
+    }
   };
 
   const handleFileChange = async (taskId: string, files: FileList | null) => {
     if (!files || !currentBatch) return;
     const fileList = Array.from(files);
-    
     const task = currentBatch.tasks.find(t => t.id === taskId);
     const template = templates.find(tpl => tpl.id === task?.templateId);
     
@@ -210,7 +197,14 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
       for (const file of files) {
         try {
-          const data = await extractSheetData(file, template.sheetName, template.startRow, template.endRow);
+          // UNIFIED PARSING: Use extractSheetData with template params (startRow, endRow, rowFilter)
+          const data = await extractSheetData(
+            file, 
+            template.sheetName, 
+            template.startRow, 
+            template.endRow, 
+            (template as any).rowFilter
+          );
           
           data.forEach((rawRow, rowIdx) => {
             const processedRow: any = {
@@ -261,13 +255,13 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
             allRows.push(processedRow);
           });
         } catch (err: any) {
-          console.error(`Error processing file ${file.name} in task ${task.id}`, err);
+          console.error(`[Batch] Task processing error for ${file.name}:`, err);
           taskHasFailure = true;
           allErrors.push({
             row: 0,
             field: 'FILE_SYSTEM',
             value: file.name,
-            message: err.message || "Unknown error parsing file",
+            message: err.message || "Failed to process file",
             severity: 'error'
           });
         }
@@ -361,7 +355,8 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
   };
 
   const exportBatch = () => {
-    if (!currentBatch) return;
+    // Note: The global XLSX is expected here as defined in index.html
+    if (!currentBatch || typeof XLSX === 'undefined') return;
 
     if (currentBatch.exportStrategy === 'multi-sheet') {
       currentBatch.tasks.forEach(task => {
@@ -708,7 +703,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
                     <button 
                       disabled={!currentBatch?.tasks.some(t => t.status === 'completed')}
                       onClick={exportToReview}
-                      className="w-full bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-4 rounded-xl font-black flex items-center justify-center gap-3 shadow-lg shadow-indigo-50 transition-all transform hover:-translate-y-1 active:scale-95 text-xs uppercase tracking-widest disabled:transform-none disabled:opacity-50"
+                      className="w-full bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-4 rounded-xl font-black flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-xs uppercase tracking-widest disabled:transform-none disabled:opacity-50"
                     >
                       <ClipboardCheck className="w-4 h-4" /> {bt.exportReview}
                     </button>

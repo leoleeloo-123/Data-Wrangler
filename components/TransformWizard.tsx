@@ -44,7 +44,7 @@ import { parseExcelMetadata, extractSheetData, ExcelSheetInfo, getExcelColumnNam
 import { suggestMappings } from '../services/geminiService';
 import { translations } from '../translations';
 
-// Performance Constants
+// Performance Constants for Safe Preview
 const PREVIEW_RENDER_ROWS = 80;
 const PREVIEW_RENDER_COLS = 25;
 
@@ -118,31 +118,34 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   // Template State
   const [newTemplateName, setNewTemplateName] = useState('');
 
-  // Optimized preview loader
+  // Optimized ON-DEMAND preview loader
   const loadTemplatePreview = async () => {
     if (!templateFile || !selectedSheet || isProcessing) return;
 
     setIsProcessing(true);
-    console.time('[Perf] Template Preview Parse');
+    const startTimestamp = performance.now();
+    
     try {
-      // 1. Fetch headers first using robust !ref logic
+      // 1. Fetch headers first using robust range detection
       const finalHeaders = await getSheetHeaders(templateFile, selectedSheet, Math.max(0, Number(startRow)));
       setAvailableHeaders(finalHeaders);
 
-      // 2. Fetch preview data with safe row limit
-      const previewRowsLimit = Math.max(300, Number(startRow) + 50);
+      // 2. Fetch preview data with safe row limit to prevent memory bloat
+      const previewRowsLimit = Math.max(300, Number(startRow) + 100);
       const dataBuffer = await templateFile.arrayBuffer();
       const workbook = XLSX.read(new Uint8Array(dataBuffer), { 
         type: 'array', 
         sheets: [selectedSheet], 
-        sheetRows: previewRowsLimit 
+        sheetRows: previewRowsLimit,
+        bookProps: false,
+        bookDeps: false,
+        cellFormula: false,
+        cellHTML: false
       });
       const worksheet = workbook.Sheets[selectedSheet];
       const raw = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0, defval: "" }) as any[][];
       
-      // Store subset in state to avoid memory bloat
       setRawPreview(raw);
-
       setAppliedStartRow(startRow);
       setAppliedEndRow(endRow);
       setAppliedRowFilter(filterColumn ? {
@@ -151,15 +154,19 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         value: filterValue
       } : undefined);
 
+      const endTimestamp = performance.now();
+      console.debug(`[Perf] On-demand sheet parse took ${(endTimestamp - startTimestamp).toFixed(2)}ms`);
+
     } catch (err) {
-      console.error("[Wizard] Preview load crash:", err);
+      console.error("[Wizard] Content load crash:", err);
       setRawPreview([]);
+      alert(language === 'zh-CN' ? "加载工作表内容失败" : "Failed to load sheet content");
     } finally {
-      console.timeEnd('[Perf] Template Preview Parse');
       setIsProcessing(false);
     }
   };
 
+  // Only auto-trigger if we are switching from initial metadata load to content load
   useEffect(() => {
     if (templateFile && selectedSheet && isSheetConfirmed) {
       loadTemplatePreview();
@@ -169,6 +176,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const handleTemplateFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      setIsProcessing(true);
+      
+      const startTimestamp = performance.now();
+      
+      // RESET ALL CONTENT STATES - Metadata only phase
       setTemplateFile(file);
       setIsSheetConfirmed(false);
       setRawPreview([]);
@@ -176,39 +188,38 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       setFilterColumn('');
       
       try {
+        // FAST METADATA LISTING
         const metadata = await parseExcelMetadata(file);
         setSheetMetadata(metadata);
         if (metadata.length > 0) {
           setSelectedSheet(metadata[0].name);
           setExportSheetName(metadata[0].name + '_Standardized');
         }
+        const endTimestamp = performance.now();
+        console.debug(`[Perf] Fast Metadata Listing took ${(endTimestamp - startTimestamp).toFixed(2)}ms`);
       } catch (err) {
         console.error("[Wizard] Metadata parse fail:", err);
+      } finally {
+        setIsProcessing(false);
       }
     }
   };
 
   const validateFileSchema = async (file: File): Promise<FileValidationResult> => {
     try {
-      // FIX: Use shared helper from excelService with expected column width hint to solve detection bug
       const fileHeaders = await getSheetHeaders(file, selectedSheet, Number(appliedStartRow), availableHeaders.length);
-      
       const missing = availableHeaders.filter(h => !fileHeaders.includes(h));
+      
       if (missing.length > 0) {
-        // Debugging logs to confirm column range detection issues
-        console.warn(`[Validation Fail] File: ${file.name}, Found: ${fileHeaders.length} cols, Template Needs: ${availableHeaders.length}, Missing:`, missing.slice(0, 10));
-        
         return {
           fileName: file.name,
           isValid: false,
-          error: language === 'zh-CN' ? `缺少列 (仅检出 ${fileHeaders.length} 列): ${missing.slice(0, 3).join(', ')}...` : `Missing columns (found only ${fileHeaders.length}): ${missing.slice(0, 3).join(', ')}...`,
+          error: language === 'zh-CN' ? `缺失列 (仅检出 ${fileHeaders.length} 列): ${missing.slice(0, 3).join(', ')}...` : `Missing columns (found only ${fileHeaders.length}): ${missing.slice(0, 3).join(', ')}...`,
           file
         };
       }
-
       return { fileName: file.name, isValid: true, file };
     } catch (err: any) {
-      console.error("[Wizard] Validation error detail:", err);
       return { fileName: file.name, isValid: false, error: err.message || "Read fail", file };
     }
   };
@@ -326,7 +337,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
   const autoMap = async () => {
     if (!selectedDef || availableHeaders.length === 0) {
-      alert(language === 'zh-CN' ? '请先在步骤2选择正确的表头行' : 'Please select a valid header row in Step 2 first');
+      alert(language === 'zh-CN' ? '请先在步骤2加载正确的工作表内容' : 'Please load valid sheet content in Step 2 first');
       return;
     }
     setIsProcessing(true);
@@ -449,14 +460,13 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const canJumpToStep = (targetStep: number) => {
     if (targetStep === 1) return true;
     if (targetStep === 2) return !!selectedDef;
-    if (targetStep === 3) return !!selectedDef && (!!templateFile || (activeTemplate && availableHeaders.length > 0));
+    if (targetStep === 3) return !!selectedDef && isSheetConfirmed && availableHeaders.length > 0;
     if (targetStep === 4) return !!selectedDef && Object.keys(mapping).length > 0 && availableHeaders.length > 0;
     if (targetStep === 5) return !!results;
     if (targetStep === 6) return !!results;
     return false;
   };
 
-  // Memoized Preview Window to prevent memory bloat and DOM overload
   const filteredPreview = useMemo(() => {
     if (!appliedRowFilter || !appliedRowFilter.columnName) return rawPreview;
     return rawPreview.filter((row, rIdx) => {
@@ -477,7 +487,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     });
   }, [rawPreview, appliedRowFilter, appliedStartRow, availableHeaders]);
 
-  // Safe Rendering Window
   const visiblePreviewRows = useMemo(() => filteredPreview.slice(0, PREVIEW_RENDER_ROWS), [filteredPreview]);
 
   return (
@@ -559,12 +568,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               {!templateFile ? (
                 <><input type="file" onChange={handleTemplateFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx, .xls" /><div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-105 shadow-sm transition-transform"><Upload className="w-10 h-10 text-indigo-600" /></div><h3 className="text-2xl font-black text-slate-800 tracking-tight">{t.uploadTitle}</h3><p className="text-slate-500 mt-2 font-bold text-base">{t.uploadSubtitle}</p></>
               ) : (
-                <div className="flex flex-col items-center w-full"><div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-50"><CheckCircle2 className="w-8 h-8 text-emerald-600" /></div><h3 className="text-xl font-black text-slate-800 tracking-tight truncate max-w-full px-4">{templateFile.name}</h3><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">{language === 'zh-CN' ? '文件已就绪' : 'File Loaded'}</p><button onClick={() => { setTemplateFile(null); setRawPreview([]); setIsSheetConfirmed(false); }} className="mt-8 bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"><Trash2 className="w-4 h-4" /> {language === 'zh-CN' ? '更改模板' : 'Change Template'}</button></div>
+                <div className="flex flex-col items-center w-full"><div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-50"><CheckCircle2 className="w-8 h-8 text-emerald-600" /></div><h3 className="text-xl font-black text-slate-800 tracking-tight truncate max-w-full px-4">{templateFile.name}</h3><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">{language === 'zh-CN' ? '文件架构元数据已就绪' : 'File Metadata Loaded'}</p><button onClick={() => { setTemplateFile(null); setRawPreview([]); setIsSheetConfirmed(false); }} className="mt-8 bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"><Trash2 className="w-4 h-4" /> {language === 'zh-CN' ? '更改模板文件' : 'Change Template'}</button></div>
               )}
             </div>
             <div className={`bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col transition-all duration-500 ${!templateFile ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
-              <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><div className="bg-indigo-50 p-2.5 rounded-xl shadow-sm"><ListFilter className="w-6 h-6 text-indigo-600" /></div><h3 className="text-xl font-black text-slate-800">{language === 'zh-CN' ? '选择工作表' : 'Select Target Sheet'}</h3></div></div>
-              <div className="relative mb-4"><input type="text" value={sheetSearchQuery} onChange={(e) => setSheetSearchQuery(e.target.value)} placeholder={language === 'zh-CN' ? '搜索工作表...' : 'Search sheets...'} className="w-full bg-slate-50 border border-slate-100 px-5 py-3 rounded-xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-indigo-50 transition-all pr-12" /><Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" /></div>
+              <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3"><div className="bg-indigo-50 p-2.5 rounded-xl shadow-sm"><ListFilter className="w-6 h-6 text-indigo-600" /></div><h3 className="text-xl font-black text-slate-800">{language === 'zh-CN' ? '检测到工作表' : 'Select Target Sheet'}</h3></div></div>
+              <div className="relative mb-4"><input type="text" value={sheetSearchQuery} onChange={(e) => setSheetSearchQuery(e.target.value)} placeholder={language === 'zh-CN' ? '快速搜索工作表...' : 'Search sheets...'} className="w-full bg-slate-50 border border-slate-100 px-5 py-3 rounded-xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-indigo-50 transition-all pr-12" /><Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" /></div>
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2 max-h-[220px]">
                 {sheetMetadata.filter(s => s.name.toLowerCase().includes(sheetSearchQuery.toLowerCase())).map((s) => (
                   <button key={s.name} onClick={() => { setSelectedSheet(s.name); setExportSheetName(s.name + '_Standardized'); setIsSheetConfirmed(false); }} className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${selectedSheet === s.name ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-300 hover:bg-slate-50'}`}><span className="font-black text-sm truncate">{s.name}</span><div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${selectedSheet === s.name ? 'bg-white text-indigo-600' : 'bg-slate-100 text-slate-300'}`}>{selectedSheet === s.name ? <Check className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}</div></button>
@@ -583,7 +592,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               <div className="lg:col-span-4 space-y-8">
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8 h-fit"><h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><Settings2 className="w-7 h-7 text-indigo-600" />{t.configTitle}</h3><div className="space-y-6"><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.targetSheet}</label><div className="w-full px-5 py-4 border border-slate-200 rounded-xl bg-slate-50/50 font-black text-slate-700 shadow-sm">{selectedSheet}</div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.headerIndex}</label><input type="number" min="0" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 0)} className="w-full px-5 py-4 border border-slate-200 rounded-xl font-black text-center text-2xl shadow-sm text-indigo-600 outline-none bg-slate-50/50" /></div><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.endRowIndex}</label><input type="number" min="0" value={endRow} placeholder={t.endRowPlaceholder} onChange={(e) => setEndRow(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full px-5 py-4 border border-slate-200 rounded-xl font-black text-center text-2xl shadow-sm text-slate-400 outline-none bg-slate-50/50" /></div></div></div></div>
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8 h-fit"><div className="flex items-center gap-3"><div className="bg-emerald-50 p-2.5 rounded-xl shadow-sm"><Filter className="w-6 h-6 text-emerald-600" /></div><div><h3 className="text-xl font-black text-slate-800 leading-tight">{t.rowFilterTitle}</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t.rowFilterSubtitle}</p></div></div><div className="space-y-6"><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.filterCol}</label><div className="relative"><select value={filterColumn} onChange={(e) => setFilterColumn(e.target.value)} className="w-full px-5 py-3.5 border border-slate-200 rounded-xl bg-slate-50/50 shadow-sm outline-none font-black text-slate-700 appearance-none pr-10"><option value="">-- No Filter --</option>{availableHeaders.map(h => <option key={h} value={h}>{h}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" /></div></div><div className={`grid gap-4 transition-all ${filterColumn ? 'grid-cols-2 opacity-100 scale-100' : 'opacity-30 scale-95 pointer-events-none'}`}><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.filterRule}</label><div className="relative"><select value={filterOperator} onChange={(e) => setFilterOperator(e.target.value as FilterOperator)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 shadow-sm outline-none font-bold text-slate-700 appearance-none"><option value="not_null">{t.opNotNull}</option><option value="not_empty">{t.opNotEmpty}</option><option value="not_zero">{t.opNotZero}</option><option value="equals">{t.opEquals}</option><option value="contains">{t.opContains}</option></select><ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" /></div></div><div className="space-y-3"><label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.filterValue}</label><input type="text" value={filterValue} onChange={(e) => setFilterValue(e.target.value)} disabled={['not_null', 'not_empty', 'not_zero'].includes(filterOperator)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 shadow-sm outline-none font-bold text-slate-700 disabled:opacity-20" /></div></div></div></div>
-                <div className="pt-6 border-t border-slate-100 flex flex-col gap-4"><button onClick={loadTemplatePreview} disabled={isProcessing} className="w-full bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-md shadow-indigo-50 transition-all transform hover:-translate-y-1 active:scale-95 text-lg"><RefreshCw className={`w-5 h-5 ${isProcessing ? 'animate-spin' : ''}`} />{language === 'zh-CN' ? '应用规则并刷新预览' : 'Apply & Refresh Preview'}</button><button onClick={() => setStep(3)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg">{t.continueMapping}<ArrowRight className="w-6 h-6" /></button></div>
+                <div className="pt-6 border-t border-slate-100 flex flex-col gap-4"><button onClick={loadTemplatePreview} disabled={isProcessing} className="w-full bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-md shadow-indigo-50 transition-all transform hover:-translate-y-1 active:scale-95 text-lg"><RefreshCw className={`w-5 h-5 ${isProcessing ? 'animate-spin' : ''}`} />{language === 'zh-CN' ? '应用配置并刷新预览' : 'Apply & Refresh Preview'}</button><button onClick={() => setStep(3)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg">{t.continueMapping}<ArrowRight className="w-6 h-6" /></button></div>
               </div>
               <div className="lg:col-span-8 space-y-6">
                 <div className="flex items-center justify-between">
