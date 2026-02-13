@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 
 interface LayoutProps {
-  children: React.Node;
+  // Fixed: Use React.ReactNode instead of React.Node
+  children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenConfig: () => void;

@@ -105,7 +105,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync state for template preview
+  // Sync state for template preview - ONLY runs when sheet is confirmed or configuration changes
   useEffect(() => {
     if (templateFile && selectedSheet && isSheetConfirmed) {
       loadTemplatePreview();
@@ -123,6 +123,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[selectedSheet];
         if (worksheet) {
+          // Parse ONLY the target sheet content for preview
           const raw = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: 0, 
@@ -130,6 +131,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
           }) as any[][];
           setRawPreview(raw.slice(0, 50));
 
+          // Parse specifically the header row for field mapping
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Math.max(0, Number(startRow)), 
@@ -161,8 +163,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       setTemplateFile(file);
       setIsSheetConfirmed(false);
       setRawPreview([]);
+      setAvailableHeaders([]);
       
       try {
+        // Fast metadata extraction: only gets sheet names
         const metadata = await parseExcelMetadata(file);
         setSheetMetadata(metadata);
         if (metadata.length > 0) {
@@ -193,6 +197,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             });
           }
 
+          // Schema validation only checks the targeted sheet in the workbook
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Math.max(0, Number(startRow)), 
@@ -203,7 +208,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             .map(h => String(h).trim())
             .filter(h => h !== "");
 
-          // Check if all template headers exist in this file
+          // Check if all template headers exist in this specific sheet
           const missing = availableHeaders.filter(h => !fileHeaders.includes(h));
           
           if (missing.length > 0) {
@@ -235,21 +240,18 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       const newFiles = Array.from(e.target.files) as File[];
       const validationResults: FileValidationResult[] = [];
       
-      // Use existing files for duplicate check (matching by name and size)
       const currentFilesInfo = batchFiles.map(f => `${f.fileName}_${f.file.size}`);
 
       for (const file of newFiles) {
         const fileKey = `${file.name}_${file.size}`;
         const isDuplicate = currentFilesInfo.includes(fileKey);
         
-        // Add to tracking to detect duplicates within the current selection batch too
         if (!isDuplicate) currentFilesInfo.push(fileKey);
 
         const res = await validateFileSchema(file);
         validationResults.push({
           ...res,
           isDuplicate,
-          // If it's a duplicate, we mark it invalid for processing purposes or just flag it
           isValid: isDuplicate ? false : res.isValid
         });
       }
@@ -279,7 +281,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setActiveTemplate(tpl);
     setNewTemplateName(tpl.name);
     setSelectedSheet(tpl.sheetName);
-    setIsSheetConfirmed(true); // Since it's a template, we assume confirmation
+    setIsSheetConfirmed(true); 
     setStartRow(tpl.startRow);
     setEndRow(tpl.endRow ?? '');
     setMapping(tpl.mapping);
@@ -289,7 +291,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setIncludeFileName(tpl.includeFileName ?? true);
     setFileNamePosition(tpl.fileNamePosition || 'front');
     
-    // Skip Step 2 & 3, go straight to Batch Upload
     setStep(4); 
   };
 
@@ -359,7 +360,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setIsProcessing(true);
     setResults(null);
     
-    // Only process valid and non-duplicate files
     const validFiles = batchFiles.filter(f => f.isValid && !f.isDuplicate).map(f => f.file);
     const endRowLimit = endRow === '' ? undefined : Number(endRow);
 
@@ -368,12 +368,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       const allErrors: ValidationError[] = [];
       const fieldStats: Record<string, { mismatchCount: number }> = {};
       
-      // Initialize stats
       selectedDef.fields.forEach(f => {
         fieldStats[f.name] = { mismatchCount: 0 };
       });
 
       for (const file of validFiles) {
+        // extractSheetData ensures only the configured sheet is parsed
         const data = await extractSheetData(file, selectedSheet, Number(startRow), endRowLimit);
         
         data.forEach((rawRow, rowIdx) => {
@@ -433,7 +433,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         fileCount: validFiles.length,
         fieldStats
       });
-      setStep(5); // Jump to Results
+      setStep(5); 
     } catch (err) {
       console.error("Transformation Error", err);
       alert(language === 'zh-CN' ? '转换过程中发生错误' : 'An error occurred during transformation');
@@ -445,7 +445,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const handleExport = () => {
     if (!results || !selectedDef) return;
     try {
-      // Reconstruct rows based on table config with strict key ordering
       const exportRows = results.rows.map(row => {
         const { __source_file__, __source_sheet__, ...dataFields } = row;
         const fileNameHeader = t.fileNameColumn;
@@ -453,17 +452,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
         
         const orderedRow: any = {};
         
-        // Add File Name Column if front
         if (includeFileName && fileNamePosition === 'front') {
           orderedRow[fileNameHeader] = infoStr;
         }
 
-        // Add Module Data Fields in original definition order
         selectedDef.fields.forEach(f => {
           orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
         });
 
-        // Add File Name Column if back
         if (includeFileName && fileNamePosition === 'back') {
           orderedRow[fileNameHeader] = infoStr;
         }
@@ -484,7 +480,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const getUnmappedCount = (tpl: TransformationTemplate) => {
     const def = definitions.find(d => d.id === tpl.definitionId);
     if (!def) return 0;
-    // Count fields in the definition that are NOT in the template's mapping object
     return def.fields.filter(f => !tpl.mapping[f.id]).length;
   };
 
@@ -717,7 +712,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               )}
             </div>
 
-            {/* Right: Sheet Selector */}
+            {/* Right: Sheet Selector - Now deferring parsing until confirmation */}
             <div className={`bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col transition-all duration-500 ${!templateFile ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -742,7 +737,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 {filteredSheetMetadata.map((s) => (
                   <button
                     key={s.name}
-                    onClick={() => { setSelectedSheet(s.name); setExportSheetName(s.name + '_Standardized'); }}
+                    onClick={() => { setSelectedSheet(s.name); setExportSheetName(s.name + '_Standardized'); setIsSheetConfirmed(false); }}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
                       selectedSheet === s.name 
                         ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
@@ -763,7 +758,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               <div className="pt-6 mt-4 border-t border-slate-50">
                 <button 
                   onClick={() => setIsSheetConfirmed(true)} 
-                  disabled={!selectedSheet || isSheetConfirmed}
+                  disabled={!selectedSheet || isSheetConfirmed || isProcessing}
                   className={`w-full py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95 shadow-lg uppercase tracking-widest text-[11px] ${
                     isSheetConfirmed 
                     ? 'bg-emerald-100 text-emerald-600 shadow-emerald-50 pointer-events-none' 
@@ -777,7 +772,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     </>
                   ) : (
                     <>
-                      <RefreshCw className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} />
+                      {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                       {language === 'zh-CN' ? '加载工作表内容' : 'Load Sheet Content'}
                     </>
                   )}
@@ -1005,7 +1000,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 bg-white rounded-xl border border-slate-50 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.validFiles}</p><p className="text-2xl font-black text-emerald-600">{validCount}</p></div>
-                      <div className="p-4 bg-white rounded-xl border border-slate-50 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.invalidFiles}</p><p className={`text-2xl font-black ${invalidCount > 0 ? 'text-amber-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
+                      <div className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.invalidFiles}</p><p className={`text-2xl font-black ${invalidCount > 0 ? 'text-amber-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
                     </div>
                     <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid && !f.isDuplicate)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-6 rounded-2xl font-black flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:transform-none text-xl">{isProcessing ? <RefreshCw className="w-7 h-7 animate-spin" /> : <Sparkles className="w-7 h-7" />}{t.execute}</button>
                   </div>
