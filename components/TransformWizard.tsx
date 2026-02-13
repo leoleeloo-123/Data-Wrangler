@@ -148,6 +148,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       setRawPreview(raw);
       setAppliedStartRow(startRow);
       setAppliedEndRow(endRow);
+      
+      // Update applied filter based on UI inputs
       setAppliedRowFilter(filterColumn ? {
         columnName: filterColumn,
         operator: filterOperator,
@@ -271,12 +273,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setIncludeFileName(tpl.includeFileName ?? true);
     setFileNamePosition(tpl.fileNamePosition || 'front');
     
-    if ((tpl as any).rowFilter) {
-      const rf = (tpl as any).rowFilter;
-      setFilterColumn(rf.columnName);
-      setFilterOperator(rf.operator);
-      setFilterValue(rf.value || '');
-      setAppliedRowFilter(rf);
+    // Restore Row Filter state to UI and internal applied state
+    if (tpl.rowFilter) {
+      setFilterColumn(tpl.rowFilter.columnName);
+      setFilterOperator(tpl.rowFilter.operator);
+      setFilterValue(tpl.rowFilter.value || '');
+      setAppliedRowFilter(tpl.rowFilter);
     } else {
       setFilterColumn('');
       setAppliedRowFilter(undefined);
@@ -302,9 +304,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       exportSheetName,
       includeFileName,
       fileNamePosition,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      rowFilter: appliedRowFilter // Persist the logic
     };
-    (template as any).rowFilter = appliedRowFilter;
 
     onSaveTemplate(template);
     setNewTemplateName('');
@@ -373,7 +375,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
       for (const file of validFiles) {
         try {
+          // CONSISTENCY: Pass appliedRowFilter to extractSheetData
           const data = await extractSheetData(file, selectedSheet, Number(appliedStartRow), endRowLimit, appliedRowFilter);
+          
           data.forEach((rawRow, rowIdx) => {
             const processedRow: any = { __source_file__: file.name, __source_sheet__: selectedSheet };
             selectedDef.fields.forEach(field => {

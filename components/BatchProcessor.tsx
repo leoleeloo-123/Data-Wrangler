@@ -197,13 +197,13 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
       for (const file of files) {
         try {
-          // UNIFIED PARSING: Use extractSheetData with template params (startRow, endRow, rowFilter)
+          // CONSISTENCY FIX: Extract data using the template's persistent rowFilter
           const data = await extractSheetData(
             file, 
             template.sheetName, 
             template.startRow, 
             template.endRow, 
-            (template as any).rowFilter
+            template.rowFilter // CRITICAL: This was missing
           );
           
           data.forEach((rawRow, rowIdx) => {

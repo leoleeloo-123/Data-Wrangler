@@ -278,7 +278,9 @@ const App: React.FC = () => {
       mapping: JSON.stringify(tpl.mapping),
       expectedHeaders: JSON.stringify(tpl.expectedHeaders || []),
       includeFileName: tpl.includeFileName ? 1 : 0,
-      fileNamePosition: tpl.fileNamePosition
+      fileNamePosition: tpl.fileNamePosition,
+      // SERIALIZE: Persist row filter logic in export
+      rowFilter: tpl.rowFilter ? JSON.stringify(tpl.rowFilter) : ''
     }));
     const templateSheet = XLSX.utils.json_to_sheet(templateData);
     XLSX.utils.book_append_sheet(wb, templateSheet, "Templates");
@@ -350,7 +352,9 @@ const App: React.FC = () => {
             expectedHeaders: typeof r.expectedHeaders === 'string' ? JSON.parse(r.expectedHeaders) : (r.expectedHeaders || []),
             includeFileName: Number(r.includeFileName) === 1,
             fileNamePosition: r.fileNamePosition || 'front',
-            endRow: r.endRow !== '' ? Number(r.endRow) : undefined
+            endRow: r.endRow !== '' ? Number(r.endRow) : undefined,
+            // DESERIALIZE: Recover row filter logic from import
+            rowFilter: r.rowFilter ? JSON.parse(r.rowFilter) : undefined
           }));
         }
 

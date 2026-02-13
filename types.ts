@@ -54,6 +54,14 @@ export interface ProcessedData {
   fieldStats: Record<string, { mismatchCount: number }>;
 }
 
+export type FilterOperator = 'not_null' | 'not_empty' | 'not_zero' | 'equals' | 'contains';
+
+export interface RowFilter {
+  columnName: string;
+  operator: FilterOperator;
+  value?: string;
+}
+
 export interface TransformationTemplate {
   id: string;
   name: string;
@@ -68,6 +76,7 @@ export interface TransformationTemplate {
   updatedAt: string;
   includeFileName: boolean;
   fileNamePosition: 'front' | 'back';
+  rowFilter?: RowFilter; // Persistent row filter logic
 }
 
 export interface BatchTask {
@@ -116,13 +125,4 @@ export interface DataReviewEntry {
       mismatchCount: number;
     }[];
   }[];
-}
-
-// Fixed missing exports for FilterOperator and RowFilter
-export type FilterOperator = 'not_null' | 'not_empty' | 'not_zero' | 'equals' | 'contains';
-
-export interface RowFilter {
-  columnName: string;
-  operator: FilterOperator;
-  value?: string;
 }
