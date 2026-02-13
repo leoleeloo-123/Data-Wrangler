@@ -326,13 +326,6 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
                   </div>
                   {t.fieldStructure}
                 </h3>
-                <button 
-                  onClick={addField}
-                  className="bg-white border-2 border-slate-200 hover:border-indigo-600 hover:text-indigo-600 px-8 py-4 rounded-xl flex items-center gap-3 text-sm font-black transition-all shadow-sm"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  {t.addField}
-                </button>
               </div>
 
               <div className="space-y-4">
@@ -417,6 +410,15 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
                     </button>
                   </div>
                 ))}
+
+                {/* New Add Field Button at Bottom */}
+                <button 
+                  onClick={addField}
+                  className="w-full py-6 border-2 border-dashed border-slate-200 rounded-2xl hover:border-indigo-600 hover:bg-indigo-50/30 hover:text-indigo-600 flex items-center justify-center gap-3 text-sm font-black text-slate-400 transition-all group"
+                >
+                  <PlusCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  {t.addField}
+                </button>
               </div>
             </div>
           </div>
