@@ -543,7 +543,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       </header>
 
       {/* Progress Bar moved below Header */}
-      <div className="flex items-center justify-between bg-white p-5 rounded-[32px] border border-slate-200 shadow-sm sticky top-4 z-40 transition-all hover:shadow-lg">
+      <div className="flex items-center justify-between bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm sticky top-4 z-40 transition-all hover:shadow-lg">
         {steps.map((s) => {
           const isAccessible = canJumpToStep(s.num);
           const isActive = step === s.num;
@@ -551,14 +551,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             <div 
               key={s.num} 
               onClick={() => handleStepClick(s.num)}
-              className={`flex items-center gap-4 px-4 flex-1 justify-center last:flex-none transition-all duration-300 ${isAccessible ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed grayscale opacity-30'}`}
+              className={`flex items-center gap-4 px-4 flex-1 justify-center last:flex-none transition-all duration-300 ${isAccessible ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'}`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all duration-300 ${
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-base transition-all duration-300 ${
                 step >= s.num ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-300'
               } ${isActive ? 'ring-8 ring-indigo-50' : ''}`}>
                 {step > s.num ? <CheckCircle2 className="w-5 h-5" /> : s.num}
               </div>
-              <span className={`text-[11px] font-black uppercase tracking-widest hidden lg:inline transition-colors duration-300 ${step >= s.num ? 'text-indigo-900' : 'text-slate-300'} ${isActive ? 'underline decoration-indigo-300 underline-offset-8' : ''}`}>
+              <span className={`text-[13px] font-black uppercase tracking-widest hidden lg:inline transition-colors duration-300 ${step >= s.num ? 'text-indigo-900' : 'text-slate-300'} ${isActive ? 'underline decoration-indigo-300 underline-offset-8' : ''}`}>
                 {s.label}
               </span>
               {s.num < 6 && <div className="h-[2px] bg-slate-50 flex-1 mx-4 hidden lg:block" />}
