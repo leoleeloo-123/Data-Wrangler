@@ -386,6 +386,13 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     }
   };
 
+  const getUnmappedCount = (tpl: TransformationTemplate) => {
+    const def = definitions.find(d => d.id === tpl.definitionId);
+    if (!def) return 0;
+    // Count fields in the definition that are NOT in the template's mapping object
+    return def.fields.filter(f => !tpl.mapping[f.id]).length;
+  };
+
   const steps = [
     { num: 1, label: language === 'zh-CN' ? '选择定义' : 'Choose Definition' },
     { num: 2, label: language === 'zh-CN' ? '解析模板' : 'Parsing Template' },
@@ -505,16 +512,27 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                           {language === 'zh-CN' ? '保存的解析逻辑' : 'Saved Logics'}
                         </p>
                         <div className="flex flex-col gap-2">
-                          {defTemplates.slice(0, 3).map(tpl => (
-                            <button
-                              key={tpl.id}
-                              onClick={() => applyTemplate(tpl)}
-                              className="w-full flex items-center justify-between text-left p-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 transition-all group"
-                            >
-                              <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-700 truncate">{tpl.name}</span>
-                              <ChevronRightIcon className="w-3 h-3 text-slate-300 group-hover:text-indigo-400" />
-                            </button>
-                          ))}
+                          {defTemplates.slice(0, 3).map(tpl => {
+                            const unmapped = getUnmappedCount(tpl);
+                            return (
+                              <button
+                                key={tpl.id}
+                                onClick={() => applyTemplate(tpl)}
+                                className="w-full flex items-center justify-between text-left p-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 transition-all group"
+                              >
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-700 truncate">{tpl.name}</span>
+                                  {unmapped > 0 && (
+                                    <span className="text-[9px] font-black text-amber-600 flex items-center gap-1 mt-0.5">
+                                      <AlertCircle className="w-2.5 h-2.5" />
+                                      {unmapped}{t.unmappedFields}
+                                    </span>
+                                  )}
+                                </div>
+                                <ChevronRightIcon className="w-3 h-3 text-slate-300 group-hover:text-indigo-400 flex-shrink-0" />
+                              </button>
+                            );
+                          })}
                           {defTemplates.length > 3 && (
                             <button 
                               onClick={() => setSelectedDef(def)}
@@ -551,15 +569,26 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 <div className="space-y-6">
                   <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><Bookmark className="w-5 h-5 text-amber-500" />{t.useTemplate}</h4>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                    {relevantTemplates.map(tpl => (
-                      <div key={tpl.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex items-center justify-between group hover:border-indigo-600 transition-all">
-                        <button onClick={() => applyTemplate(tpl)} className="flex-1 text-left">
-                          <p className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{tpl.name}</p>
-                          <p className="text-xs text-slate-400 font-bold mt-1">Updated {new Date(tpl.updatedAt).toLocaleDateString()} • {Object.keys(tpl.mapping).length} fields mapped</p>
-                        </button>
-                        <button onClick={() => onDeleteTemplate(tpl.id)} className="p-2 text-slate-200 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
+                    {relevantTemplates.map(tpl => {
+                      const unmapped = getUnmappedCount(tpl);
+                      return (
+                        <div key={tpl.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex items-center justify-between group hover:border-indigo-600 transition-all">
+                          <button onClick={() => applyTemplate(tpl)} className="flex-1 text-left min-w-0">
+                            <div className="flex items-center gap-3">
+                              <p className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{tpl.name}</p>
+                              {unmapped > 0 && (
+                                <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {unmapped} {t.unmappedFields}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 font-bold mt-1">Updated {new Date(tpl.updatedAt).toLocaleDateString()} • {Object.keys(tpl.mapping).length} fields mapped</p>
+                          </button>
+                          <button onClick={() => onDeleteTemplate(tpl.id)} className="p-2 text-slate-200 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      );
+                    })}
                     {relevantTemplates.length === 0 && <div className="text-center py-10 text-slate-400 italic">No saved templates for this module.</div>}
                   </div>
                 </div>

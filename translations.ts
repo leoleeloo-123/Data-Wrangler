@@ -113,7 +113,8 @@ export const translations = {
       validFiles: 'Valid Files',
       invalidFiles: 'Invalid Files',
       totalFiles: 'Total Files',
-      noDataPreview: 'No data available to preview.'
+      noDataPreview: 'No data available to preview.',
+      unmappedFields: 'unmapped fields'
     },
     config: {
       title: 'System Config',
@@ -236,7 +237,8 @@ export const translations = {
       validFiles: '架构一致',
       invalidFiles: '架构不匹配',
       totalFiles: '文件总数',
-      noDataPreview: '暂无预览数据。'
+      noDataPreview: '暂无预览数据。',
+      unmappedFields: '个未映射字段'
     },
     config: {
       title: '系统配置',
