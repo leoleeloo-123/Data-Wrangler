@@ -11,7 +11,11 @@ import {
   Search,
   Calendar,
   Layers,
-  Table as TableIcon
+  Table as TableIcon,
+  X,
+  Clock,
+  Files,
+  FileDown
 } from 'lucide-react';
 import { DataReviewEntry } from '../types';
 import { translations } from '../translations';
@@ -53,46 +57,62 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
         <div className="grid grid-cols-1 gap-6">
           {entries.length > 0 ? (
             entries.map((entry) => (
-              <div key={entry.id} className="bg-white p-8 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all flex flex-col md:flex-row items-center gap-10 group relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 text-slate-50 group-hover:text-indigo-50 transition-colors">
-                  <ClipboardCheck className="w-32 h-32" />
+              <div key={entry.id} className="bg-white p-6 md:p-8 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all flex flex-col md:flex-row items-center gap-8 group relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 text-slate-50 group-hover:text-indigo-50/50 transition-colors pointer-events-none">
+                  <ClipboardCheck className="w-40 h-40" />
                 </div>
-                <div className="flex-1 space-y-4 relative z-10">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-indigo-50 p-4 rounded-2xl shadow-sm">
-                      <Layers className="w-8 h-8 text-indigo-600" />
+                
+                <div className="flex-shrink-0 bg-indigo-50 p-5 rounded-[28px] shadow-sm relative z-10">
+                  <Layers className="w-10 h-10 text-indigo-600" />
+                </div>
+
+                <div className="flex-1 space-y-6 relative z-10 w-full min-w-0">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <h3 className="text-2xl font-black text-slate-800 truncate">{entry.batchName}</h3>
+                      <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border ${
+                        entry.strategy === 'consolidated' 
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                        : 'bg-blue-50 text-blue-600 border-blue-100'
+                      }`}>
+                        {entry.strategy === 'consolidated' ? <FileDown className="w-3 h-3" /> : <Files className="w-3 h-3" />}
+                        {entry.strategy === 'consolidated' 
+                          ? (language === 'zh-CN' ? '统一输出' : 'Consolidated') 
+                          : (language === 'zh-CN' ? '分拆输出' : 'Multi-sheet')}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-800">{entry.batchName}</h3>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Calendar className="w-3 h-3" /> {new Date(entry.timestamp).toLocaleString()}
-                      </p>
-                    </div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5" /> {new Date(entry.timestamp).toLocaleString()}
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  
+                  <div className="flex flex-wrap gap-2.5">
                     {entry.tasks.map((task, idx) => (
-                      <span key={idx} className="bg-slate-50 border border-slate-100 px-4 py-1.5 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        {task.modelName} ({task.rowCount} Rows)
+                      <span key={idx} className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest shadow-sm">
+                        {task.modelName} <span className="text-indigo-400 ml-1">({task.rowCount} ROWS)</span>
                       </span>
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 relative z-10">
+
+                <div className="flex items-center gap-3 relative z-10 w-full md:w-auto justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-8">
                   <button 
                     onClick={() => setSelectedEntry(entry)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5 active:scale-95"
                   >
                     <Eye className="w-5 h-5" /> {language === 'zh-CN' ? '查看详情' : 'Inspect'}
                   </button>
                   <button 
                     onClick={() => handleDownloadEntry(entry)}
-                    className="p-4 text-slate-400 hover:text-indigo-600 bg-slate-50 rounded-2xl transition-colors"
+                    title={language === 'zh-CN' ? '导出 Excel' : 'Download Excel'}
+                    className="p-4 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-200 shadow-sm"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                   <button 
                     onClick={() => onDeleteEntry(entry.id)}
-                    className="p-4 text-slate-300 hover:text-red-500 bg-slate-50 rounded-2xl transition-colors"
+                    title={language === 'zh-CN' ? '删除记录' : 'Delete Entry'}
+                    className="p-4 text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-red-100 shadow-sm"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -106,7 +126,7 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
                 {language === 'zh-CN' ? '尚无 Review 记录。' : 'No Data Review records available.'}
               </p>
               <p className="text-slate-300 font-bold max-w-md mx-auto leading-relaxed">
-                {language === 'zh-CN' ? '在批处理界面执行“导出到 Data Review”即可在此查看快照。' : 'Export batch results to Review from the Batch Processor to see snapshots here.'}
+                {language === 'zh-CN' ? '在批量处理界面执行“导出到数据复核”即可在此查看快照。' : 'Export batch results to Review from the Batch Processor to see snapshots here.'}
               </p>
             </div>
           )}
@@ -131,7 +151,9 @@ const DataReview: React.FC<DataReviewProps> = ({ entries, onDeleteEntry, languag
                </div>
                <div>
                   <h2 className="text-4xl font-black text-slate-800 tracking-tighter">{selectedEntry.batchName}</h2>
-                  <p className="text-slate-400 font-black uppercase tracking-widest text-sm mt-2">{selectedEntry.strategy === 'multi-sheet' ? 'Split Files' : 'Consolidated Sheet'} • Created {new Date(selectedEntry.timestamp).toLocaleString()}</p>
+                  <div className="flex items-center gap-4 mt-2">
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm">{selectedEntry.strategy === 'multi-sheet' ? 'Split Files' : 'Consolidated Sheet'} • Created {new Date(selectedEntry.timestamp).toLocaleString()}</p>
+                  </div>
                </div>
             </div>
 
