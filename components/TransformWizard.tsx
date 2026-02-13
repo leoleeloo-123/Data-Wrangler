@@ -431,27 +431,32 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   };
 
   const handleExport = () => {
-    if (!results) return;
+    if (!results || !selectedDef) return;
     try {
-      // Reconstruct rows based on table config
+      // Reconstruct rows based on table config with strict key ordering
       const exportRows = results.rows.map(row => {
-        const infoStr = `${row.__source_file__}_${row.__source_sheet__}`;
         const { __source_file__, __source_sheet__, ...dataFields } = row;
-        
-        const finalRow: any = {};
         const fileNameHeader = t.fileNameColumn;
-
+        const infoStr = `${__source_file__}_${__source_sheet__}`;
+        
+        const orderedRow: any = {};
+        
+        // Add File Name Column if front
         if (includeFileName && fileNamePosition === 'front') {
-          finalRow[fileNameHeader] = infoStr;
+          orderedRow[fileNameHeader] = infoStr;
         }
 
-        Object.assign(finalRow, dataFields);
+        // Add Module Data Fields in original definition order
+        selectedDef.fields.forEach(f => {
+          orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
+        });
 
+        // Add File Name Column if back
         if (includeFileName && fileNamePosition === 'back') {
-          finalRow[fileNameHeader] = infoStr;
+          orderedRow[fileNameHeader] = infoStr;
         }
 
-        return finalRow;
+        return orderedRow;
       });
       
       const worksheet = XLSX.utils.json_to_sheet(exportRows);

@@ -296,14 +296,31 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
     if (currentBatch.exportStrategy === 'multi-sheet') {
       // Logic: Split Files - Export one Excel per model, each using global sheet name
       currentBatch.tasks.forEach(task => {
-        if (task.results && task.results.rows.length > 0) {
+        const template = templates.find(tpl => tpl.id === task.templateId);
+        const def = definitions.find(d => d.id === template?.definitionId);
+
+        if (task.results && task.results.rows.length > 0 && template && def) {
           const wb = XLSX.utils.book_new();
           const unifiedSheetName = (currentBatch.globalSheetName || 'Sheet1').substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '_');
           const outputFileName = (task.customOutputFileName || 'Task_Output').replace(/[\[\]\*\?\/\\]/g, '_');
           
-          const cleanRows = task.results.rows.map(r => {
-             const { __source_file__, __source_sheet__, ...clean } = r;
-             return clean;
+          const cleanRows = task.results.rows.map(row => {
+            const { __source_file__, __source_sheet__, ...dataFields } = row;
+            const fileNameHeader = translations[language].transform.fileNameColumn;
+            const infoStr = `${__source_file__}_${__source_sheet__}`;
+            
+            const orderedRow: any = {};
+            // Strict ordering based on template settings
+            if (template.includeFileName && template.fileNamePosition === 'front') {
+              orderedRow[fileNameHeader] = infoStr;
+            }
+            def.fields.forEach(f => {
+              orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
+            });
+            if (template.includeFileName && template.fileNamePosition === 'back') {
+              orderedRow[fileNameHeader] = infoStr;
+            }
+            return orderedRow;
           });
 
           const ws = XLSX.utils.json_to_sheet(cleanRows);
@@ -317,11 +334,29 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
       const outputFileName = (currentBatch.globalFileName || 'Consolidated_Batch').replace(/[\[\]\*\?\/\\]/g, '_');
       
       currentBatch.tasks.forEach(task => {
-        if (task.results && task.results.rows.length > 0) {
+        const template = templates.find(tpl => tpl.id === task.templateId);
+        const def = definitions.find(d => d.id === template?.definitionId);
+
+        if (task.results && task.results.rows.length > 0 && template && def) {
           const taskSheetName = (task.customOutputSheetName || 'Model_Sheet').substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '_');
-          const cleanRows = task.results.rows.map(r => {
-             const { __source_file__, __source_sheet__, ...clean } = r;
-             return clean;
+          
+          const cleanRows = task.results.rows.map(row => {
+            const { __source_file__, __source_sheet__, ...dataFields } = row;
+            const fileNameHeader = translations[language].transform.fileNameColumn;
+            const infoStr = `${__source_file__}_${__source_sheet__}`;
+            
+            const orderedRow: any = {};
+            // Strict ordering based on template settings
+            if (template.includeFileName && template.fileNamePosition === 'front') {
+              orderedRow[fileNameHeader] = infoStr;
+            }
+            def.fields.forEach(f => {
+              orderedRow[f.name] = dataFields[f.name] !== undefined ? dataFields[f.name] : null;
+            });
+            if (template.includeFileName && template.fileNamePosition === 'back') {
+              orderedRow[fileNameHeader] = infoStr;
+            }
+            return orderedRow;
           });
 
           const ws = XLSX.utils.json_to_sheet(cleanRows);
