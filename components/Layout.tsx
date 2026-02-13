@@ -42,7 +42,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
           <span className="font-bold text-xl tracking-tight text-slate-800">TaxStandard</span>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -50,13 +50,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 ${
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive 
-                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-black' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                    ? 'bg-indigo-50 text-indigo-700 shadow-sm font-bold' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'
                 }`}
               >
-                <Icon className={`w-6 h-6 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
                 <span className="text-base">{item.label}</span>
                 {isActive && <ChevronRight className="w-4 h-4 ml-auto opacity-50" />}
               </button>
@@ -67,10 +67,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onOp
         <div className="p-4 mt-auto border-t border-slate-100">
           <button 
             onClick={onOpenConfig}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors font-medium"
           >
-            <Settings className="w-6 h-6 text-slate-400" />
-            <span className="text-base font-medium">{t.sidebar.config}</span>
+            <Settings className="w-5 h-5 text-slate-400" />
+            <span className="text-base">{t.sidebar.config}</span>
           </button>
         </div>
       </aside>

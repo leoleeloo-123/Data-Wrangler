@@ -540,15 +540,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const relevantTemplates = selectedDef ? templates.filter(t => t.definitionId === selectedDef.id) : [];
 
   return (
-    <div className="p-12 max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4">
-      {/* Consistent Page Header */}
+    <div className="px-8 py-10 max-w-[1800px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4">
+      {/* Page Header */}
       <header>
         <h1 className="text-5xl font-black text-slate-800 tracking-tighter">{t.title}</h1>
         <p className="text-slate-500 font-bold mt-2 text-lg">{t.subtitle}</p>
       </header>
 
-      {/* Progress Bar moved below Header */}
-      <div className="flex items-center justify-between bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm sticky top-4 z-40 transition-all hover:shadow-lg">
+      {/* Progress Bar */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-4 z-40 transition-all hover:shadow-md">
         {steps.map((s) => {
           const isAccessible = canJumpToStep(s.num);
           const isActive = step === s.num;
@@ -556,14 +556,14 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             <div 
               key={s.num} 
               onClick={() => handleStepClick(s.num)}
-              className={`flex items-center gap-4 px-4 flex-1 justify-center last:flex-none transition-all duration-300 ${isAccessible ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'}`}
+              className={`flex items-center gap-3 px-4 flex-1 justify-center last:flex-none transition-all duration-300 ${isAccessible ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'}`}
             >
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-base transition-all duration-300 ${
-                step >= s.num ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-300'
-              } ${isActive ? 'ring-8 ring-indigo-50' : ''}`}>
-                {step > s.num ? <CheckCircle2 className="w-5 h-5" /> : s.num}
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm transition-all duration-300 ${
+                step >= s.num ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-300'
+              } ${isActive ? 'ring-4 ring-indigo-50' : ''}`}>
+                {step > s.num ? <CheckCircle2 className="w-4 h-4" /> : s.num}
               </div>
-              <span className={`text-[13px] font-black uppercase tracking-widest hidden lg:inline transition-colors duration-300 ${step >= s.num ? 'text-indigo-900' : 'text-slate-300'} ${isActive ? 'underline decoration-indigo-300 underline-offset-8' : ''}`}>
+              <span className={`text-[12px] font-black uppercase tracking-widest hidden lg:inline transition-colors duration-300 ${step >= s.num ? 'text-indigo-900' : 'text-slate-300'} ${isActive ? 'underline decoration-indigo-300 underline-offset-4' : ''}`}>
                 {s.label}
               </span>
               {s.num < 6 && <div className="h-[2px] bg-slate-50 flex-1 mx-4 hidden lg:block" />}
@@ -573,21 +573,21 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       </div>
 
       {step === 1 && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-8">
           {!selectedDef ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {definitions.map((def) => {
                 const defTemplates = templates.filter(tpl => tpl.definitionId === def.id);
                 return (
                   <div
                     key={def.id}
-                    className="flex flex-col h-full bg-white rounded-[40px] border-2 border-slate-200 hover:border-indigo-300 transition-all shadow-sm overflow-hidden"
+                    className="flex flex-col h-full bg-white rounded-2xl border-2 border-slate-200 hover:border-indigo-300 transition-all shadow-sm overflow-hidden"
                   >
                     <button
                       onClick={() => { setSelectedDef(def); }}
                       className="p-8 text-left flex-1"
                     >
-                      <div className="bg-indigo-50 p-4 rounded-2xl shadow-sm border border-slate-100 self-start mb-6 inline-block">
+                      <div className="bg-indigo-50 p-4 rounded-xl shadow-sm border border-slate-100 self-start mb-6 inline-block">
                         <Database className="w-8 h-8 text-indigo-600" />
                       </div>
                       <h3 className="font-black text-slate-800 text-xl mb-3">{def.name}</h3>
@@ -607,7 +607,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                               <button
                                 key={tpl.id}
                                 onClick={() => applyTemplate(tpl)}
-                                className="w-full flex items-center justify-between text-left p-4 rounded-2xl bg-white border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 transition-all group shadow-sm"
+                                className="w-full flex items-center justify-between text-left p-3 rounded-xl bg-white border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 transition-all group shadow-sm"
                               >
                                 <div className="flex flex-col min-w-0">
                                   <span className="text-sm font-black text-slate-600 group-hover:text-indigo-700 truncate">{tpl.name}</span>
@@ -622,14 +622,6 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                               </button>
                             );
                           })}
-                          {defTemplates.length > 3 && (
-                            <button 
-                              onClick={() => setSelectedDef(def)}
-                              className="text-[10px] font-black text-indigo-600 hover:underline text-center mt-2 uppercase tracking-widest"
-                            >
-                              {language === 'zh-CN' ? `查看更多 (${defTemplates.length})` : `View all (${defTemplates.length})`}
-                            </button>
-                          )}
                         </div>
                       </div>
                     )}
@@ -638,47 +630,47 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               })}
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto space-y-10">
-              <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-8">
-                  <div className="bg-indigo-50 p-5 rounded-[24px] shadow-sm"><Database className="w-10 h-10 text-indigo-600" /></div>
+            <div className="max-w-4xl mx-auto space-y-8">
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="bg-indigo-50 p-4 rounded-xl shadow-sm"><Database className="w-8 h-8 text-indigo-600" /></div>
                   <div>
                     <h3 className="text-3xl font-black text-slate-800 tracking-tight">{selectedDef.name}</h3>
                     <p className="text-slate-400 font-black uppercase tracking-widest text-xs mt-2">{selectedDef.fields.length} Fields Configured</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedDef(null)} className="p-4 text-slate-300 hover:text-slate-800 transition-colors bg-slate-50 rounded-2xl"><X className="w-8 h-8" /></button>
+                <button onClick={() => setSelectedDef(null)} className="p-3 text-slate-300 hover:text-slate-800 transition-colors bg-slate-50 rounded-xl"><X className="w-6 h-6" /></button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <button onClick={() => setStep(2)} className="group bg-white p-12 rounded-[56px] border-2 border-dashed border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/30 transition-all text-center space-y-6">
-                  <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto group-hover:bg-indigo-600 transition-colors shadow-inner"><ArrowRight className="w-10 h-10 text-slate-300 group-hover:text-white" /></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <button onClick={() => setStep(2)} className="group bg-white p-10 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/30 transition-all text-center space-y-6">
+                  <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto group-hover:bg-indigo-600 transition-colors shadow-inner"><ArrowRight className="w-8 h-8 text-slate-300 group-hover:text-white" /></div>
                   <h4 className="text-2xl font-black text-slate-800 tracking-tight">{t.startFresh}</h4>
-                  <p className="text-slate-500 font-bold leading-relaxed">{language === 'zh-CN' ? '从头开始配置新文件结构的解析逻辑。' : 'Configure parsing logic from scratch for new file structures.'}</p>
+                  <p className="text-slate-500 font-bold leading-relaxed text-sm">{language === 'zh-CN' ? '从头开始配置新文件结构的解析逻辑。' : 'Configure parsing logic from scratch for new file structures.'}</p>
                 </button>
-                <div className="space-y-8">
-                  <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Bookmark className="w-6 h-6 text-amber-500" />{t.useTemplate}</h4>
-                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-4">
+                <div className="space-y-6">
+                  <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Bookmark className="w-5 h-5 text-amber-500" />{t.useTemplate}</h4>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                     {relevantTemplates.map(tpl => {
                       const unmapped = getUnmappedCount(tpl);
                       return (
-                        <div key={tpl.id} className="bg-white p-8 rounded-[36px] border border-slate-200 flex items-center justify-between group hover:border-indigo-600 transition-all shadow-sm">
+                        <div key={tpl.id} className="bg-white p-6 rounded-2xl border border-slate-200 flex items-center justify-between group hover:border-indigo-600 transition-all shadow-sm">
                           <button onClick={() => applyTemplate(tpl)} className="flex-1 text-left min-w-0">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                               <p className="text-lg font-black text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{tpl.name}</p>
                               {unmapped > 0 && (
                                 <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1 flex-shrink-0">
-                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <AlertCircle className="w-3 h-3" />
                                   {unmapped} {t.unmappedFields}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-slate-400 font-bold mt-2">Updated {new Date(tpl.updatedAt).toLocaleDateString()} • {Object.keys(tpl.mapping).length} fields mapped</p>
+                            <p className="text-xs text-slate-400 font-bold mt-1">Updated {new Date(tpl.updatedAt).toLocaleDateString()} • {Object.keys(tpl.mapping).length} fields mapped</p>
                           </button>
-                          <button onClick={() => onDeleteTemplate(tpl.id)} className="p-3 text-slate-200 hover:text-red-500 transition-all"><Trash2 className="w-5 h-5" /></button>
+                          <button onClick={() => onDeleteTemplate(tpl.id)} className="p-2 text-slate-200 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       );
                     })}
-                    {relevantTemplates.length === 0 && <div className="text-center py-16 text-slate-300 font-bold italic opacity-50">No saved templates for this module.</div>}
+                    {relevantTemplates.length === 0 && <div className="text-center py-16 text-slate-300 font-bold italic opacity-50 text-sm">No saved templates for this module.</div>}
                   </div>
                 </div>
               </div>
@@ -688,81 +680,80 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       )}
 
       {step === 2 && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12">
-          <div className={`bg-white border-4 border-dashed border-slate-200 rounded-[56px] p-20 text-center transition-all hover:border-indigo-300 relative group shadow-inner ${templateFile ? 'border-emerald-200 bg-emerald-50/10' : ''}`}>
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+          <div className={`bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center transition-all hover:border-indigo-300 relative group shadow-inner ${templateFile ? 'border-emerald-200 bg-emerald-50/10' : ''}`}>
             {!templateFile ? (
               <>
                 <input type="file" onChange={handleTemplateFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx, .xls" />
-                <div className="bg-indigo-50 w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-10 group-hover:scale-110 shadow-sm transition-transform"><Upload className="w-12 h-12 text-indigo-600" /></div>
+                <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 group-hover:scale-105 shadow-sm transition-transform"><Upload className="w-10 h-10 text-indigo-600" /></div>
                 <h3 className="text-3xl font-black text-slate-800 tracking-tight">{t.uploadTitle}</h3>
-                <p className="text-slate-500 mt-4 font-bold text-lg">{t.uploadSubtitle}</p>
+                <p className="text-slate-500 mt-3 font-bold text-lg">{t.uploadSubtitle}</p>
               </>
             ) : (
               <div className="flex flex-col items-center">
-                <div className="bg-emerald-100 w-28 h-28 rounded-full flex items-center justify-center mb-10 shadow-emerald-50 shadow-lg"><CheckCircle2 className="w-14 h-14 text-emerald-600" /></div>
-                <h3 className="text-3xl font-black text-slate-800 tracking-tight">{templateFile.name}</h3>
-                <button onClick={() => { setTemplateFile(null); setRawPreview([]); }} className="mt-10 bg-white border border-slate-200 px-8 py-3 rounded-2xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all shadow-sm"><Trash2 className="w-5 h-5" /> Change Template</button>
+                <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mb-8 shadow-lg shadow-emerald-50"><CheckCircle2 className="w-10 h-10 text-emerald-600" /></div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">{templateFile.name}</h3>
+                <button onClick={() => { setTemplateFile(null); setRawPreview([]); }} className="mt-8 bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:border-red-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"><Trash2 className="w-4 h-4" /> Change Template</button>
               </div>
             )}
           </div>
           {templateFile && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              <div className="lg:col-span-4 bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-10 h-fit sticky top-32">
-                <h3 className="text-2xl font-black text-slate-800 flex items-center gap-4"><Settings2 className="w-8 h-8 text-indigo-600" />{t.configTitle}</h3>
-                <div className="space-y-10">
-                  <div className="space-y-4">
-                    <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.targetSheet}</label>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              <div className="lg:col-span-4 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8 h-fit sticky top-32">
+                <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><Settings2 className="w-7 h-7 text-indigo-600" />{t.configTitle}</h3>
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.targetSheet}</label>
                     <div className="relative">
-                      <select value={selectedSheet} onChange={(e) => setSelectedSheet(e.target.value)} className="w-full px-6 py-5 border border-slate-200 rounded-3xl bg-slate-50/50 font-bold text-slate-700 shadow-sm outline-none focus:ring-8 focus:ring-indigo-50 transition-all appearance-none pr-12">
+                      <select value={selectedSheet} onChange={(e) => setSelectedSheet(e.target.value)} className="w-full px-5 py-4 border border-slate-200 rounded-xl bg-slate-50/50 font-bold text-slate-700 shadow-sm outline-none focus:ring-4 focus:ring-indigo-50 transition-all appearance-none pr-10">
                         {sheetMetadata.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                       </select>
-                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                      <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.headerIndex}</label>
-                      <input type="number" min="0" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 0)} className="w-full px-6 py-6 border border-slate-200 rounded-3xl font-black text-center text-4xl shadow-sm text-indigo-600 outline-none bg-slate-50/50 focus:ring-8 focus:ring-indigo-50 transition-all" />
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.headerIndex}</label>
+                      <input type="number" min="0" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 0)} className="w-full px-5 py-5 border border-slate-200 rounded-xl font-black text-center text-3xl shadow-sm text-indigo-600 outline-none bg-slate-50/50 focus:ring-4 focus:ring-indigo-50 transition-all" />
                     </div>
-                    <div className="space-y-4">
-                      <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.endRowIndex}</label>
-                      <input type="number" min="0" value={endRow} placeholder={t.endRowPlaceholder} onChange={(e) => setEndRow(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full px-6 py-6 border border-slate-200 rounded-3xl font-black text-center text-4xl shadow-sm text-slate-400 outline-none bg-slate-50/50 focus:ring-8 focus:ring-indigo-50 transition-all focus:text-indigo-600" />
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{t.endRowIndex}</label>
+                      <input type="number" min="0" value={endRow} placeholder={t.endRowPlaceholder} onChange={(e) => setEndRow(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full px-5 py-5 border border-slate-200 rounded-xl font-black text-center text-3xl shadow-sm text-slate-400 outline-none bg-slate-50/50 focus:ring-4 focus:ring-indigo-50 transition-all focus:text-indigo-600" />
                     </div>
                   </div>
                 </div>
                 <div className="pt-6 border-t border-slate-100">
-                  <button onClick={() => setStep(3)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-6 rounded-[32px] font-black flex items-center justify-center gap-4 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg">{t.continueMapping}<ArrowRight className="w-7 h-7" /></button>
+                  <button onClick={() => setStep(3)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg">{t.continueMapping}<ArrowRight className="w-6 h-6" /></button>
                 </div>
               </div>
-              <div className="lg:col-span-8 space-y-8">
+              <div className="lg:col-span-8 space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-black text-slate-800 flex items-center gap-4 tracking-tight"><Eye className="w-8 h-8 text-emerald-500" />{t.previewTitle}</h3>
-                  <button onClick={() => setShowSkippedRows(!showSkippedRows)} className={`text-[11px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl border-2 transition-all shadow-sm flex items-center gap-3 ${showSkippedRows ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}>
-                    {showSkippedRows ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3 tracking-tight"><Eye className="w-7 h-7 text-emerald-500" />{t.previewTitle}</h3>
+                  <button onClick={() => setShowSkippedRows(!showSkippedRows)} className={`text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-xl border-2 transition-all shadow-sm flex items-center gap-2 ${showSkippedRows ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}>
+                    {showSkippedRows ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     {language === 'zh-CN' ? (showSkippedRows ? '显示顶部' : '隐藏顶部') : (showSkippedRows ? 'Show Header' : 'Hide Header')}
                   </button>
                 </div>
-                <div className="bg-white rounded-[48px] border border-slate-200 shadow-xl overflow-auto custom-scrollbar max-h-[700px]">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-auto custom-scrollbar max-h-[700px]">
                   {rawPreview.length > 0 ? (
                     <table className="w-full text-left text-xs border-separate border-spacing-0">
                       <thead className="bg-slate-50 sticky top-0 z-20">
                         <tr>
-                          <th className="px-6 py-6 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 w-20 text-center">Row</th>
-                          {(rawPreview[startRow] || []).map((_, i) => <th key={i} className="px-8 py-6 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
+                          <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 w-20 text-center">Row</th>
+                          {(rawPreview[startRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold transition-all">
                         {rawPreview.map((row, rIdx) => {
                           const isHeader = rIdx === startRow;
                           if (rIdx < startRow && !showSkippedRows) return null;
-                          // Optional end row preview logic
                           const endRowLimit = endRow === '' ? Infinity : Number(endRow);
                           if (rIdx > endRowLimit) return null;
 
                           return (
                             <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-30' : 'hover:bg-slate-50/50'}`}>
-                              <td className={`px-6 py-5 text-center border-r-2 border-slate-50 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-300'}`}>{rIdx}</td>
-                              {row.map((cell: any, cIdx: number) => <td key={cIdx} className={`px-8 py-5 whitespace-nowrap truncate max-w-[250px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>)}
+                              <td className={`px-5 py-4 text-center border-r-2 border-slate-50 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-300'}`}>{rIdx}</td>
+                              {row.map((cell: any, cIdx: number) => <td key={cIdx} className={`px-6 py-4 whitespace-nowrap truncate max-w-[250px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>)}
                             </tr>
                           );
                         })}
@@ -779,48 +770,48 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       )}
 
       {step === 3 && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12">
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-4xl font-black text-slate-800 tracking-tight">{language === 'zh-CN' ? '字段映射架构' : t.mappingTitle}</h2>
               <p className="text-slate-500 font-bold text-lg mt-2">{t.mappingSubtitle}</p>
             </div>
-            <button onClick={autoMap} disabled={isProcessing || availableHeaders.length === 0} className="bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-10 py-5 rounded-3xl font-black flex items-center gap-4 transition-all shadow-2xl shadow-indigo-50 disabled:opacity-50 text-lg">{isProcessing ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}{t.autoMap}</button>
+            <button onClick={autoMap} disabled={isProcessing || availableHeaders.length === 0} className="bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-4 rounded-xl font-black flex items-center gap-3 transition-all shadow-lg shadow-indigo-50 disabled:opacity-50 text-lg">{isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}{t.autoMap}</button>
           </div>
-          <div className="bg-white rounded-[48px] border border-slate-200 shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
             <table className="w-full text-left">
-              <thead><tr className="bg-slate-50 border-b-2 border-slate-100"><th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">Target Field</th><th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">Source Template Column</th><th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Constraint</th></tr></thead>
+              <thead><tr className="bg-slate-50 border-b-2 border-slate-100"><th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Target Field</th><th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Source Template Column</th><th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Constraint</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {selectedDef?.fields.map((field) => (
                   <tr key={field.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-12 py-10">
-                      <div className="flex items-center gap-6">
-                        <div className="bg-indigo-50 p-4 rounded-2xl shadow-sm border border-indigo-100">
-                          <Database className="w-6 h-6 text-indigo-500" />
+                    <td className="px-10 py-8">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-indigo-50 p-3 rounded-xl shadow-sm border border-indigo-100">
+                          <Database className="w-5 h-5 text-indigo-500" />
                         </div>
                         <div>
-                          <p className="font-black text-slate-800 text-lg">{field.name}</p>
-                          <p className="text-[10px] text-slate-400 font-black mt-2 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300" />{field.type}</p>
+                          <p className="font-black text-slate-800 text-base">{field.name}</p>
+                          <p className="text-[9px] text-slate-400 font-black mt-1 uppercase tracking-widest flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-slate-300" />{field.type}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-12 py-10">
+                    <td className="px-10 py-8">
                       <div className="relative">
                         <select 
                           value={mapping[field.id] || ''} 
                           onChange={(e) => setMapping(prev => ({ ...prev, [field.id]: e.target.value }))} 
-                          className="w-full px-6 py-4.5 border border-slate-200 rounded-3xl bg-slate-50/50 shadow-sm outline-none font-bold text-slate-700 transition-all focus:ring-8 focus:ring-indigo-50 appearance-none pr-12"
+                          className="w-full px-5 py-3.5 border border-slate-200 rounded-xl bg-slate-50/50 shadow-sm outline-none font-bold text-slate-700 transition-all focus:ring-4 focus:ring-indigo-50 appearance-none pr-10"
                         >
                           {<option value="">{t.unmapped}</option>}
                           {availableHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                         </select>
-                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       </div>
                     </td>
-                    <td className="px-12 py-10 text-center">
+                    <td className="px-10 py-8 text-center">
                       {field.required ? 
-                        <span className="inline-flex px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-700 shadow-sm border border-red-200">Strict</span> : 
-                        <span className="inline-flex px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 shadow-sm border border-slate-200">Optional</span>
+                        <span className="inline-flex px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-red-100 text-red-700 shadow-sm border border-red-200">Strict</span> : 
+                        <span className="inline-flex px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 shadow-sm border border-slate-200">Optional</span>
                       }
                     </td>
                   </tr>
@@ -828,86 +819,66 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </tbody>
             </table>
           </div>
-          <div className="flex justify-between items-center pt-10"><button onClick={() => setStep(2)} className="text-slate-400 hover:text-slate-800 font-black px-10 py-5 transition-all uppercase tracking-[.3em] text-xs flex items-center gap-3 hover:bg-white rounded-3xl border border-transparent hover:border-slate-200">&larr; Back</button><button onClick={() => setStep(4)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-14 py-6 rounded-[36px] font-black flex items-center gap-5 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-1 text-lg">{t.uploadSources}<ArrowRight className="w-7 h-7" /></button></div>
+          <div className="flex justify-between items-center pt-8"><button onClick={() => setStep(2)} className="text-slate-400 hover:text-slate-800 font-black px-8 py-4 transition-all uppercase tracking-[.3em] text-xs flex items-center gap-3 hover:bg-white rounded-xl border border-transparent hover:border-slate-200">&larr; Back</button><button onClick={() => setStep(4)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-2xl font-black flex items-center gap-4 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 text-lg">{t.uploadSources}<ArrowRight className="w-6 h-6" /></button></div>
         </div>
       )}
 
       {step === 4 && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-8 space-y-8">
-              <div className="bg-white border-4 border-dashed border-slate-200 rounded-[56px] p-24 text-center transition-all hover:border-indigo-300 relative min-h-[500px] flex flex-col items-center justify-center group shadow-inner">
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-20 text-center transition-all hover:border-indigo-300 relative min-h-[450px] flex flex-col items-center justify-center group shadow-inner">
                 <input type="file" multiple onChange={handleBatchFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx, .xls" />
-                <div className="bg-indigo-50 w-32 h-32 rounded-full flex items-center justify-center mb-10 group-hover:scale-110 shadow-sm transition-transform"><Files className="w-14 h-14 text-indigo-600" /></div>
+                <div className="bg-indigo-50 w-24 h-24 rounded-full flex items-center justify-center mb-8 group-hover:scale-105 shadow-sm transition-transform"><Files className="w-10 h-10 text-indigo-600" /></div>
                 <h3 className="text-3xl font-black text-slate-800 tracking-tight">{t.batchUpload}</h3>
-                <p className="text-slate-400 font-bold mt-4 text-lg">{language === 'zh-CN' ? '支持批量拖拽多文件及文件夹' : 'Supports multi-file dynamic drag & drop and folder uploads'}</p>
+                <p className="text-slate-400 font-bold mt-3 text-lg">{language === 'zh-CN' ? '支持批量拖拽多文件及文件夹' : 'Supports multi-file dynamic drag & drop and folder uploads'}</p>
               </div>
               {batchFiles.length > 0 && (
-                <div className="bg-white rounded-[48px] border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in">
-                  <div className="p-8 border-b-2 border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Files className="w-5 h-5 text-indigo-500" />{t.validationTitle}</h3>
-                    <div className="flex gap-4">
-                      <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-5 py-2 rounded-full border border-emerald-100 shadow-sm">{validCount} {t.validFiles}</span>
-                      <span className={`text-[11px] font-black px-5 py-2 rounded-full border shadow-sm ${invalidCount > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' : 'text-slate-300 bg-white border-slate-100'}`}>{invalidCount} {t.invalidFiles}</span>
-                      {duplicateCount > 0 && <span className="text-[11px] font-black text-red-600 bg-red-50 px-5 py-2 rounded-full border border-red-100 shadow-sm">{duplicateCount} {t.duplicatedFiles}</span>}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in">
+                  <div className="p-6 border-b-2 border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><Files className="w-4 h-4 text-indigo-500" />{t.validationTitle}</h3>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">{validCount} {t.validFiles}</span>
+                      <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border shadow-sm ${invalidCount > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' : 'text-slate-300 bg-white border-slate-100'}`}>{invalidCount} {t.invalidFiles}</span>
+                      {duplicateCount > 0 && <span className="text-[10px] font-black text-red-600 bg-red-50 px-4 py-1.5 rounded-full border border-red-100 shadow-sm">{duplicateCount} {t.duplicatedFiles}</span>}
                     </div>
                   </div>
                   <div className="max-h-[600px] overflow-y-auto custom-scrollbar divide-y-2 divide-slate-50">
                     {validCount > 0 && (
-                      <div className="p-8 flex items-start justify-between bg-emerald-50/20 group transition-colors hover:bg-emerald-50/40">
-                        <div className="flex items-start gap-8">
-                          <div className="p-4 rounded-2xl bg-white shadow-sm">
-                            <Check className="w-6 h-6 text-emerald-600" />
+                      <div className="p-6 flex items-start justify-between bg-emerald-50/20 group transition-colors hover:bg-emerald-50/40">
+                        <div className="flex items-start gap-6">
+                          <div className="p-3 rounded-xl bg-white shadow-sm">
+                            <Check className="w-5 h-5 text-emerald-600" />
                           </div>
                           <div className="overflow-hidden">
-                            <p className="font-black text-slate-800 text-lg">{t.validationSuccess}</p>
-                            <p className="text-sm font-bold text-emerald-600 mt-2 max-w-full leading-relaxed">
+                            <p className="font-black text-slate-800 text-base">{t.validationSuccess}</p>
+                            <p className="text-xs font-bold text-emerald-600 mt-1 max-w-full leading-relaxed">
                               {getValidFilesString()}
                             </p>
                           </div>
                         </div>
                         <button 
                           onClick={removeAllValid}
-                          className="p-4 text-slate-200 hover:text-red-500 transition-all hover:bg-white rounded-2xl shadow-sm"
-                          title={language === 'zh-CN' ? '移除所有有效文件' : 'Remove all valid files'}
+                          className="p-3 text-slate-200 hover:text-red-500 transition-all hover:bg-white rounded-xl shadow-sm"
                         >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {duplicateCount > 0 && (
-                      <div className="p-8 flex items-start justify-between bg-red-50/20 group transition-colors hover:bg-red-50/40 border-b border-red-100">
-                        <div className="flex items-start gap-8">
-                          <div className="p-4 rounded-2xl bg-white shadow-sm ring-2 ring-red-100">
-                            <CopyX className="w-6 h-6 text-red-600" />
-                          </div>
-                          <div className="overflow-hidden">
-                            <p className="font-black text-red-900 text-lg">{t.duplicatedFiles}</p>
-                            <p className="text-sm font-bold text-red-600 mt-2 leading-relaxed">
-                              {duplicateBatchFiles.map(f => f.fileName).join(', ')}
-                            </p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={removeAllDuplicates}
-                          className="p-4 text-red-300 hover:text-red-600 transition-all hover:bg-white rounded-2xl shadow-sm"
-                          title={language === 'zh-CN' ? '移除所有重复文件' : 'Remove all duplicates'}
-                        >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     )}
                     
-                    {invalidBatchFiles.map((res, i) => (
-                      <div key={res.fileName + i} className="p-8 flex items-center justify-between hover:bg-amber-50/10 transition-colors">
-                        <div className="flex items-center gap-8 overflow-hidden">
-                          <div className="p-4 rounded-2xl bg-white shadow-sm">
-                            <AlertCircle className="w-6 h-6 text-amber-500" />
+                    {/* Simplified duplicate/invalid list to save space */}
+                    {[...duplicateBatchFiles, ...invalidBatchFiles].slice(0, 10).map((res, i) => (
+                      <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                        <div className="flex items-center gap-6 overflow-hidden">
+                          <div className="p-3 rounded-xl bg-white shadow-sm">
+                            {res.isDuplicate ? <CopyX className="w-5 h-5 text-red-600" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
                           </div>
                           <div className="overflow-hidden">
-                            <p className="font-black truncate text-slate-800 text-lg">{res.fileName}</p>
-                            <p className="text-xs font-bold uppercase tracking-widest mt-2 text-amber-600 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-200" />{res.error}</p>
+                            <p className="font-black truncate text-slate-800 text-base">{res.fileName}</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 flex items-center gap-2 ${res.isDuplicate ? 'text-red-600' : 'text-amber-600'}`}>
+                              <div className={`w-1 h-1 rounded-full ${res.isDuplicate ? 'bg-red-200' : 'bg-amber-200'}`} />
+                              {res.isDuplicate ? t.duplicateFound : res.error}
+                            </p>
                           </div>
                         </div>
                         <button 
@@ -915,9 +886,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                             const actualIdx = batchFiles.findIndex(f => f.fileName === res.fileName && f.file === res.file);
                             if (actualIdx > -1) removeBatchFile(actualIdx);
                           }} 
-                          className="p-4 text-slate-200 hover:text-red-500 transition-all hover:bg-white rounded-2xl shadow-sm"
+                          className="p-3 text-slate-200 hover:text-red-500 transition-all hover:bg-white rounded-xl shadow-sm"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -926,26 +897,23 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               )}
             </div>
             <div className="lg:col-span-4 space-y-8">
-              <div className={`bg-white p-12 rounded-[56px] border shadow-2xl transition-all h-fit ${batchFiles.length === 0 ? 'opacity-40' : allBatchFilesValid ? 'border-emerald-200 bg-emerald-50/30' : (duplicateCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-amber-100 bg-amber-50/30')}`}>
-                {batchFiles.length === 0 ? <div className="text-center py-20"><Info className="w-20 h-20 text-slate-100 mx-auto mb-6" /><p className="text-slate-400 font-black uppercase tracking-widest text-xs">{t.noFiles}</p></div> : 
-                  <div className="space-y-10">
-                    <div className="flex items-center gap-6">
-                      <div className={`p-6 rounded-[32px] ${allBatchFilesValid ? 'bg-emerald-500' : (duplicateCount > 0 ? 'bg-red-500' : 'bg-amber-500')} text-white shadow-lg`}>
-                        {allBatchFilesValid ? <CheckCircle2 className="w-10 h-10" /> : <AlertCircle className="w-10 h-10" />}
+              <div className={`bg-white p-10 rounded-2xl border shadow-xl transition-all h-fit ${batchFiles.length === 0 ? 'opacity-40' : allBatchFilesValid ? 'border-emerald-200 bg-emerald-50/30' : (duplicateCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-amber-100 bg-amber-50/30')}`}>
+                {batchFiles.length === 0 ? <div className="text-center py-20"><Info className="w-16 h-16 text-slate-100 mx-auto mb-4" /><p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">{t.noFiles}</p></div> : 
+                  <div className="space-y-8">
+                    <div className="flex items-center gap-5">
+                      <div className={`p-5 rounded-xl ${allBatchFilesValid ? 'bg-emerald-500' : (duplicateCount > 0 ? 'bg-red-500' : 'bg-amber-500')} text-white shadow-lg`}>
+                        {allBatchFilesValid ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
                       </div>
                       <div>
-                        <h4 className="text-2xl font-black text-slate-800 tracking-tight">{allBatchFilesValid ? 'Ready' : 'Issues Detected'}</h4>
-                        <p className="text-sm text-slate-500 font-bold mt-2 leading-tight">{allBatchFilesValid ? t.allValid : t.someInvalid}</p>
+                        <h4 className="text-xl font-black text-slate-800 tracking-tight">{allBatchFilesValid ? 'Ready' : 'Issues Detected'}</h4>
+                        <p className="text-xs text-slate-500 font-bold mt-1 leading-tight">{allBatchFilesValid ? t.allValid : t.someInvalid}</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="p-6 bg-white rounded-3xl border border-slate-50 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t.validFiles}</p><p className="text-3xl font-black text-emerald-600">{validCount}</p></div>
-                      <div className="p-6 bg-white rounded-3xl border border-slate-50 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t.invalidFiles}</p><p className={`text-3xl font-black ${invalidCount > 0 ? 'text-amber-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
-                      {duplicateCount > 0 && (
-                        <div className="p-6 bg-white rounded-3xl border border-red-100 shadow-sm col-span-2"><p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">{t.duplicatedFiles}</p><p className="text-3xl font-black text-red-600">{duplicateCount}</p></div>
-                      )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-white rounded-xl border border-slate-50 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.validFiles}</p><p className="text-2xl font-black text-emerald-600">{validCount}</p></div>
+                      <div className="p-4 bg-white rounded-xl border border-slate-50 shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.invalidFiles}</p><p className={`text-2xl font-black ${invalidCount > 0 ? 'text-amber-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
                     </div>
-                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid && !f.isDuplicate)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-8 rounded-[40px] font-black flex items-center justify-center gap-5 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:scale-95 disabled:opacity-50 disabled:transform-none text-xl">{isProcessing ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Sparkles className="w-8 h-8" />}{t.execute}</button>
+                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid && !f.isDuplicate)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-6 rounded-2xl font-black flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:transform-none text-xl">{isProcessing ? <RefreshCw className="w-7 h-7 animate-spin" /> : <Sparkles className="w-7 h-7" />}{t.execute}</button>
                   </div>
                 }
               </div>
@@ -955,97 +923,94 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       )}
 
       {step === 5 && results && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 h-full">
-          {/* Summary Row with Next Step button on the far right */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 items-stretch">
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
-              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.rowsProcessed}</p>
-              <h3 className={`text-3xl font-black tracking-tight text-slate-800`}>
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10 h-full">
+          {/* Summary Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.rowsProcessed}</p>
+              <h3 className={`text-2xl font-black tracking-tight text-slate-800`}>
                 {t.rowsProcessedSummary.replace('{0}', results.fileCount.toString()).replace('{1}', results.rows.length.toLocaleString())}
               </h3>
             </div>
             
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
-              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-red-400 transition-colors">{t.qualityIssues}</p>
-              <h3 className={`text-5xl font-black tracking-tight ${results.errors.length > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest group-hover:text-red-400 transition-colors">{t.qualityIssues}</p>
+              <h3 className={`text-4xl font-black tracking-tight ${results.errors.length > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                 {results.errors.length.toLocaleString()}
               </h3>
             </div>
 
-            <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
-              <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.healthScore}</p>
-              <h3 className={`text-5xl font-black tracking-tight text-indigo-600`}>
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col justify-center">
+              <p className="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{t.healthScore}</p>
+              <h3 className={`text-4xl font-black tracking-tight text-indigo-600`}>
                 {Math.max(0, 100 - (results.errors.length / (results.rows.length * (selectedDef?.fields.length || 1)) * 100)).toFixed(1)}%
               </h3>
             </div>
 
-            {/* Rapid Workflow Access: Next step on the same row */}
             <button 
               onClick={() => setStep(6)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white p-10 rounded-[48px] shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:scale-95 flex flex-col justify-center items-center gap-4 group"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white p-8 rounded-2xl shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 flex flex-col justify-center items-center gap-3 group"
             >
               <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest group-hover:text-white transition-colors">
                  {language === 'zh-CN' ? '下一步' : 'Next Step'}
               </p>
-              <h3 className="text-2xl font-black text-center leading-tight">
+              <h3 className="text-xl font-black text-center leading-tight">
                 {t.gotoSave}
               </h3>
-              <ArrowRight className="w-8 h-8" />
+              <ArrowRight className="w-6 h-6" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
-            <div className="xl:col-span-12 space-y-8">
-              <h3 className="text-2xl font-black text-slate-800 flex items-center gap-4 tracking-tight"><CheckCircle2 className="w-8 h-8 text-emerald-500" />{t.previewTitle}</h3>
-              <div className="bg-white rounded-[56px] border border-slate-200 overflow-hidden shadow-2xl flex flex-col h-[600px]">
-                <div className="flex-1 overflow-auto custom-scrollbar">
-                  {results.rows.length > 0 ? (
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 sticky top-0 z-10 border-b-2 border-slate-100">
-                        <tr>
-                          <th className="px-8 py-6 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-r border-slate-100 w-16 text-center">#</th>
-                          <th className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest bg-slate-50 border-r border-slate-100 min-w-[200px]">{t.fileNameColumn}</th>
-                          {selectedDef?.fields.map(f => {
-                            const stats = results.fieldStats[f.name];
-                            return (
-                              <th key={f.id} className="px-8 py-6 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">
-                                {f.name} 
-                                <span className={`ml-2 text-[10px] font-black px-2 py-0.5 rounded-full ${stats.mismatchCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
-                                  ({f.type} | {stats.mismatchCount})
-                                </span>
-                              </th>
-                            );
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-bold">
-                        {results.rows.slice(0, 100).map((row, i) => (
-                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-8 py-4 text-slate-300 font-black bg-slate-50/30 text-center border-r border-slate-50">{i + 1}</td>
-                            <td className="px-8 py-4 text-slate-400 font-black italic border-r border-slate-50">
-                              {row.__source_file__}_{row.__source_sheet__}
+          <div className="space-y-6">
+            <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3 tracking-tight"><CheckCircle2 className="w-7 h-7 text-emerald-500" />{t.previewTitle}</h3>
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl flex flex-col h-[600px]">
+              <div className="flex-1 overflow-auto custom-scrollbar">
+                {results.rows.length > 0 ? (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 z-10 border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-6 py-5 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-r border-slate-100 w-16 text-center">#</th>
+                        <th className="px-6 py-5 font-black text-slate-800 uppercase tracking-widest bg-slate-50 border-r border-slate-100 min-w-[200px]">{t.fileNameColumn}</th>
+                        {selectedDef?.fields.map(f => {
+                          const stats = results.fieldStats[f.name];
+                          return (
+                            <th key={f.id} className="px-6 py-5 font-black text-slate-800 uppercase tracking-widest whitespace-nowrap bg-slate-50">
+                              {f.name} 
+                              <span className={`ml-2 text-[9px] font-black px-2 py-0.5 rounded-full ${stats.mismatchCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                                ({f.type} | {stats.mismatchCount})
+                              </span>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-bold">
+                      {results.rows.slice(0, 100).map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 text-slate-300 font-black bg-slate-50/30 text-center border-r border-slate-50">{i + 1}</td>
+                          <td className="px-6 py-4 text-slate-400 font-black italic border-r border-slate-50">
+                            {row.__source_file__}_{row.__source_sheet__}
+                          </td>
+                          {selectedDef?.fields.map(f => (
+                            <td key={f.id} className="px-6 py-4 text-slate-600 whitespace-nowrap">
+                              {row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-200 font-black italic">NULL</span>}
                             </td>
-                            {selectedDef?.fields.map(f => (
-                              <td key={f.id} className="px-8 py-4 text-slate-600 whitespace-nowrap">
-                                {row[f.name] !== null && row[f.name] !== undefined ? String(row[f.name]) : <span className="text-slate-200 font-black italic">NULL</span>}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="p-40 text-center text-slate-200 font-black italic text-2xl opacity-50">{t.noDataPreview}</div>
-                  )}
-                </div>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-40 text-center text-slate-200 font-black italic text-2xl opacity-50">{t.noDataPreview}</div>
+                )}
               </div>
             </div>
           </div>
           
-          <div className="flex justify-start items-center pt-10">
+          <div className="flex justify-start items-center pt-8">
             <button 
               onClick={() => { setStep(1); resetState(); }} 
-              className="px-12 py-6 bg-white border-2 border-slate-200 text-slate-500 rounded-[40px] font-black hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm uppercase tracking-widest text-xs"
+              className="px-10 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-xl font-black hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm uppercase tracking-widest text-[10px]"
             >
               {t.initNew}
             </button>
@@ -1054,111 +1019,110 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       )}
 
       {step === 6 && selectedDef && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 max-w-[1400px] mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
-              <div className="flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-[10px]">
-                <Database className="w-4 h-4" />
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10 max-w-[1500px] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 flex flex-col hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 text-indigo-600 font-black uppercase tracking-widest text-[9px]">
+                <Database className="w-3.5 h-3.5" />
                 {t.summaryTarget}
               </div>
               <div className="flex-1">
-                <h4 className="text-2xl font-black text-slate-800 leading-tight tracking-tight">{selectedDef.name}</h4>
-                <p className="text-xs text-slate-500 mt-2 font-bold leading-relaxed line-clamp-3">{selectedDef.description}</p>
+                <h4 className="text-xl font-black text-slate-800 leading-tight tracking-tight">{selectedDef.name}</h4>
+                <p className="text-[11px] text-slate-500 mt-2 font-bold leading-relaxed line-clamp-3">{selectedDef.description}</p>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8 flex flex-col hover:shadow-xl transition-all">
-              <div className="flex items-center gap-3 text-emerald-600 font-black uppercase tracking-widest text-[10px]">
-                <Settings2 className="w-4 h-4" />
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 text-emerald-600 font-black uppercase tracking-widest text-[9px]">
+                <Settings2 className="w-3.5 h-3.5" />
                 {t.summarySource}
               </div>
-              <div className="space-y-4 flex-1">
+              <div className="space-y-3 flex-1">
                 {[
                   { label: 'Sheet', val: selectedSheet },
                   { label: 'Header Row', val: startRow },
                   { label: 'End Row', val: endRow === '' ? 'All' : endRow },
-                  { label: 'Batch Files', val: `${batchFiles.filter(f => f.isValid).length} Valid` }
+                  { label: 'Files', val: `${batchFiles.filter(f => f.isValid).length}` }
                 ].map((row, idx) => (
-                  <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
-                    <span className="text-slate-400 font-black text-[9px] uppercase tracking-widest">{row.label}</span>
-                    <span className="font-black text-slate-800 text-sm truncate ml-2">{row.val}</span>
+                  <div key={idx} className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+                    <span className="text-slate-400 font-black text-[8px] uppercase tracking-widest">{row.label}</span>
+                    <span className="font-black text-slate-800 text-xs truncate ml-2">{row.val}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col h-full hover:shadow-xl transition-all">
-              <div className="flex items-center gap-3 text-amber-500 font-black uppercase tracking-widest text-[10px]">
-                <Map className="w-4 h-4" />
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 flex flex-col h-full hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 text-amber-500 font-black uppercase tracking-widest text-[9px]">
+                <Map className="w-3.5 h-3.5" />
                 {t.summaryMapping}
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                 {selectedDef.fields.map(f => (
-                  <div key={f.id} className="flex items-center justify-between gap-4 py-2 border-b border-slate-50 last:border-0">
-                    <span className="text-[10px] font-black text-slate-500 truncate flex-shrink-0 uppercase tracking-wider">{f.name}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-200" />
-                    <span className="text-[10px] font-black text-indigo-600 truncate text-right">
-                      {mapping[f.id] || (language === 'zh-CN' ? '未映射' : 'Not Mapped')}
+                  <div key={f.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-50 last:border-0">
+                    <span className="text-[9px] font-black text-slate-500 truncate flex-shrink-0 uppercase tracking-wider">{f.name}</span>
+                    <span className="text-[9px] font-black text-indigo-600 truncate text-right">
+                      {mapping[f.id] || 'None'}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
-              <div className="flex items-center gap-3 text-pink-500 font-black uppercase tracking-widest text-[10px]">
-                <FileOutput className="w-4 h-4" />
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 flex flex-col hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 text-pink-500 font-black uppercase tracking-widest text-[9px]">
+                <FileOutput className="w-3.5 h-3.5" />
                 {language === 'zh-CN' ? '输出配置' : 'Output Config'}
               </div>
-              <div className="space-y-4 flex-1">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '文件名 (.xlsx)' : 'File Name (.xlsx)'}</label>
+              <div className="space-y-3 flex-1">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">FileName</label>
                   <input 
                     type="text" 
                     value={exportFileName} 
                     onChange={(e) => setExportFileName(e.target.value)} 
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-pink-50 transition-all text-[11px]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-2 focus:ring-pink-50 transition-all text-[10px]"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{language === 'zh-CN' ? '工作表名称' : 'Sheet Name'}</label>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">SheetName</label>
                   <input 
                     type="text" 
                     value={exportSheetName} 
                     onChange={(e) => setExportSheetName(e.target.value)} 
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-pink-50 transition-all text-[11px]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg font-black text-slate-700 bg-slate-50/50 outline-none focus:ring-2 focus:ring-pink-50 transition-all text-[10px]"
                   />
                 </div>
               </div>
             </div>
 
             {/* Table Config Card */}
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6 flex flex-col hover:shadow-xl transition-all">
-              <div className="flex items-center gap-3 text-cyan-500 font-black uppercase tracking-widest text-[10px]">
-                <TableProperties className="w-4 h-4" />
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 flex flex-col hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 text-cyan-500 font-black uppercase tracking-widest text-[9px]">
+                <TableProperties className="w-3.5 h-3.5" />
                 {t.tableConfig}
               </div>
-              <div className="space-y-6 flex-1">
+              <div className="space-y-4 flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.showFileName}</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.showFileName}</span>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" checked={includeFileName} onChange={(e) => setIncludeFileName(e.target.checked)} />
-                    <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
+                    <div className="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
                   </label>
                 </div>
                 {includeFileName && (
-                  <div className="space-y-3 pt-2 border-t border-slate-50">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.colPosition}</label>
-                    <div className="flex bg-slate-50 p-1 rounded-xl">
+                  <div className="space-y-2 pt-2 border-t border-slate-50">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.colPosition}</label>
+                    <div className="flex bg-slate-50 p-1 rounded-lg">
                       <button 
                         onClick={() => setFileNamePosition('front')}
-                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${fileNamePosition === 'front' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-1.5 text-[9px] font-black rounded-md transition-all ${fileNamePosition === 'front' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         {t.posFront}
                       </button>
                       <button 
                         onClick={() => setFileNamePosition('back')}
-                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${fileNamePosition === 'back' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-1.5 text-[9px] font-black rounded-md transition-all ${fileNamePosition === 'back' ? 'bg-white text-cyan-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         {t.posBack}
                       </button>
@@ -1169,46 +1133,46 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="bg-indigo-900 p-12 rounded-[64px] shadow-2xl space-y-10 text-white flex flex-col justify-between group overflow-hidden relative">
-              <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/5 rounded-full group-hover:scale-150 transition-transform duration-1000" />
-              <div className="space-y-8 relative z-10">
-                <div className="flex items-center gap-6">
-                  <div className="bg-white/10 p-5 rounded-[32px] shadow-sm">
-                    <Bookmark className="w-10 h-10 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-indigo-900 p-10 rounded-2xl shadow-xl space-y-8 text-white flex flex-col justify-between group overflow-hidden relative">
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000" />
+              <div className="space-y-6 relative z-10">
+                <div className="flex items-center gap-5">
+                  <div className="bg-white/10 p-4 rounded-xl shadow-sm">
+                    <Bookmark className="w-8 h-8 text-white" />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[11px] font-black text-indigo-300 uppercase tracking-[.3em] mb-3">
+                    <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-[.2em] mb-2">
                       {t.templateName}
                     </label>
                     <input 
                       type="text" 
                       value={newTemplateName} 
                       onChange={(e) => setNewTemplateName(e.target.value)} 
-                      placeholder="e.g. EMEA Monthly VAT Pipeline" 
-                      className="w-full bg-indigo-950/40 border border-white/10 px-8 py-6 rounded-[32px] text-2xl font-black focus:ring-8 focus:ring-indigo-500/30 outline-none transition-all shadow-inner" 
+                      placeholder="e.g. Pipeline Name" 
+                      className="w-full bg-indigo-950/40 border border-white/10 px-6 py-5 rounded-xl text-xl font-black focus:ring-4 focus:ring-indigo-500/30 outline-none transition-all shadow-inner" 
                     />
                   </div>
                 </div>
-                <p className="text-indigo-200 font-bold text-lg leading-relaxed px-4">
-                  {language === 'zh-CN' ? '将当前的解析逻辑保存为模板，以便将来在控制台中一键应用。' : 'Save the current parsing logic as a template to apply it with one click from the dashboard in the future.'}
+                <p className="text-indigo-200 font-bold text-base leading-relaxed">
+                  {language === 'zh-CN' ? '将当前的解析逻辑保存为模板，以便将来一键应用。' : 'Save current logic as a template for future one-click application.'}
                 </p>
               </div>
-              <div className="pt-8 relative z-10">
+              <div className="pt-6 relative z-10">
                 {activeTemplate ? (
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-4">
                     <button 
                       onClick={() => handleSaveTemplate(false)} 
-                      className="w-full bg-indigo-600 border-2 border-white/20 text-white px-8 py-6 rounded-[36px] font-black shadow-2xl hover:bg-indigo-500 transition-all flex items-center justify-center gap-4 uppercase tracking-[.2em] text-[11px] transform hover:-translate-y-1"
+                      className="w-full bg-indigo-600 border-2 border-white/20 text-white px-6 py-4 rounded-xl font-black shadow-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-3 uppercase tracking-[.2em] text-[10px] transform hover:-translate-y-1"
                     >
-                      <Save className="w-6 h-6" />
+                      <Save className="w-5 h-5" />
                       {t.saveUpdate}
                     </button>
                     <button 
                       onClick={() => handleSaveTemplate(true)} 
-                      className="w-full bg-white/10 border-2 border-white/20 text-white px-8 py-6 rounded-[36px] font-black shadow-2xl hover:bg-white/20 transition-all flex items-center justify-center gap-4 uppercase tracking-[.2em] text-[11px] transform hover:-translate-y-1"
+                      className="w-full bg-white/10 border-2 border-white/20 text-white px-6 py-4 rounded-xl font-black shadow-lg hover:bg-white/20 transition-all flex items-center justify-center gap-3 uppercase tracking-[.2em] text-[10px] transform hover:-translate-y-1"
                     >
-                      <Copy className="w-6 h-6" />
+                      <Copy className="w-5 h-5" />
                       {t.saveAs}
                     </button>
                   </div>
@@ -1216,53 +1180,53 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                   <button 
                     onClick={() => handleSaveTemplate(true)} 
                     disabled={!newTemplateName} 
-                    className="w-full bg-indigo-600 border-2 border-white/20 text-white px-10 py-8 rounded-[40px] font-black shadow-2xl hover:bg-indigo-500 transition-all transform hover:-translate-y-2 disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-5 uppercase tracking-[.3em] text-lg"
+                    className="w-full bg-indigo-600 border-2 border-white/20 text-white px-8 py-6 rounded-xl font-black shadow-lg hover:bg-indigo-500 transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-4 uppercase tracking-[.2em] text-lg"
                   >
-                    <Save className="w-8 h-8" />
+                    <Save className="w-6 h-6" />
                     {t.saveFinish}
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="bg-white p-12 rounded-[64px] border border-slate-200 shadow-2xl space-y-10 flex flex-col justify-between group overflow-hidden relative">
-              <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-50/30 rounded-full group-hover:scale-150 transition-transform duration-1000" />
-              <div className="space-y-8 relative z-10">
-                 <div className="flex items-center gap-6">
-                  <div className="bg-indigo-50 p-5 rounded-[32px] shadow-sm">
-                    <Download className="w-10 h-10 text-indigo-600" />
+            <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-xl space-y-8 flex flex-col justify-between group overflow-hidden relative">
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-50/30 rounded-full group-hover:scale-125 transition-transform duration-1000" />
+              <div className="space-y-6 relative z-10">
+                 <div className="flex items-center gap-5">
+                  <div className="bg-indigo-50 p-4 rounded-xl shadow-sm">
+                    <Download className="w-8 h-8 text-indigo-600" />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[11px] font-black text-slate-300 uppercase tracking-[.3em] mb-3">
-                      {language === 'zh-CN' ? '立即导出' : 'Export results now'}
+                    <label className="block text-[10px] font-black text-slate-300 uppercase tracking-[.2em] mb-2">
+                      {language === 'zh-CN' ? '立即导出' : 'Export now'}
                     </label>
-                    <p className="text-slate-800 text-4xl font-black tracking-tighter leading-none">
-                      {language === 'zh-CN' ? '标准化结果已就绪' : 'Standardized results ready'}
+                    <p className="text-slate-800 text-3xl font-black tracking-tighter leading-none">
+                      {language === 'zh-CN' ? '标准化结果已就绪' : 'Results Ready'}
                     </p>
                   </div>
                 </div>
-                <p className="text-slate-500 font-bold text-lg leading-relaxed px-4">
-                  {language === 'zh-CN' ? '将标准化后的数据保存为 Excel 文件，符合 ERP 导入格式要求。' : 'Save the standardized data as an Excel file, compliant with ERP import format requirements.'}
+                <p className="text-slate-500 font-bold text-base leading-relaxed">
+                  {language === 'zh-CN' ? '将标准化后的数据保存为 Excel 文件，符合 ERP 导入格式。' : 'Save standardized data as an Excel file, ERP import format compliant.'}
                 </p>
               </div>
-              <div className="pt-8 relative z-10">
+              <div className="pt-6 relative z-10">
                 <button 
                   onClick={handleExport}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-8 rounded-[40px] font-black shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 flex items-center justify-center gap-5 uppercase tracking-[.3em] text-lg"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-6 rounded-xl font-black shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-4 uppercase tracking-[.2em] text-lg"
                 >
-                  <Download className="w-8 h-8" />
+                  <Download className="w-6 h-6" />
                   {t.export}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-start pt-6">
+          <div className="flex justify-start pt-4">
             <button 
               onClick={() => setStep(5)} 
-              className="px-12 py-5 border-2 border-slate-200 text-slate-300 font-black rounded-[32px] hover:bg-white hover:text-slate-800 hover:border-slate-800 transition-all uppercase tracking-[.4em] text-[10px] flex items-center gap-4 group"
+              className="px-8 py-3 border-2 border-slate-200 text-slate-300 font-black rounded-xl hover:bg-white hover:text-slate-800 hover:border-slate-800 transition-all uppercase tracking-[.3em] text-[10px] flex items-center gap-3 group"
             >
-              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back
             </button>
           </div>
         </div>
