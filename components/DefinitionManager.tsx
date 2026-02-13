@@ -16,7 +16,8 @@ import {
   Edit,
   ChevronDown,
   Tag,
-  GripVertical
+  GripVertical,
+  Copy
 } from 'lucide-react';
 import { DataDefinition, FieldDefinition, FieldType, DataGroup } from '../types';
 import { translations } from '../translations';
@@ -59,6 +60,18 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
     if (window.confirm(t.deleteConfirm)) {
       onDelete(id);
     }
+  };
+
+  const handleDuplicate = () => {
+    if (!currentDef) return;
+    const duplicate: DataDefinition = {
+      ...currentDef,
+      id: crypto.randomUUID(),
+      name: `${currentDef.name} Copy`,
+      createdAt: new Date().toISOString()
+    };
+    onSave(duplicate);
+    setIsEditing(false);
   };
 
   const addField = () => {
@@ -240,6 +253,13 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, grou
                 className="px-8 py-3 text-slate-500 hover:bg-white rounded-xl font-black uppercase tracking-widest text-xs transition-all border border-transparent hover:border-slate-200 shadow-sm"
               >
                 {t.cancel}
+              </button>
+              <button 
+                onClick={handleDuplicate}
+                className="px-8 py-3 bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2 shadow-sm"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {t.duplicate}
               </button>
               <button 
                 onClick={() => { if(currentDef) onSave(currentDef); setIsEditing(false); }}
