@@ -744,7 +744,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 <input type="file" multiple onChange={handleBatchFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx, .xls" />
                 <div className="bg-indigo-50 w-32 h-32 rounded-full flex items-center justify-center mb-10 group-hover:scale-110 shadow-sm transition-transform"><Files className="w-14 h-14 text-indigo-600" /></div>
                 <h3 className="text-3xl font-black text-slate-800 tracking-tight">{t.batchUpload}</h3>
-                <p className="text-slate-400 font-bold mt-4 text-lg">{language === 'zh-CN' ? '支持批量拖拽多文件及文件夹' : 'Supports multi-file drag & drop and folder uploads'}</p>
+                <p className="text-slate-400 font-bold mt-4 text-lg">{language === 'zh-CN' ? '支持批量拖拽多文件及文件夹' : 'Supports multi-file dynamic drag & drop and folder uploads'}</p>
               </div>
               {batchFiles.length > 0 && (
                 <div className="bg-white rounded-[48px] border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in">
@@ -833,20 +833,35 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
       {step === 5 && results && (
         <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12 h-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+          {/* Summary Row with Next Step button on the far right */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 items-stretch">
             {[
               { label: t.rowsProcessed, value: results.rows.length.toLocaleString(), unit: language === 'zh-CN' ? '行' : 'Rows', color: 'slate' },
               { label: t.qualityIssues, value: results.errors.length.toLocaleString(), unit: '', color: results.errors.length > 0 ? 'red' : 'emerald' },
               { label: t.healthScore, value: `${Math.max(0, 100 - (results.errors.length / (results.rows.length * (selectedDef?.fields.length || 1)) * 100)).toFixed(1)}%`, unit: '', color: 'indigo' }
             ].map((stat, i) => (
-              <div key={i} className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group">
+              <div key={i} className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-center">
                 <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{stat.label}</p>
                 <h3 className={`text-5xl font-black tracking-tight ${stat.color === 'red' ? 'text-red-500' : stat.color === 'emerald' ? 'text-emerald-500' : stat.color === 'indigo' ? 'text-indigo-600' : 'text-slate-800'}`}>
                   {stat.value} <span className="text-xl font-bold text-slate-300 ml-1">{stat.unit}</span>
                 </h3>
               </div>
             ))}
+            {/* Rapid Workflow Access: Next step on the same row */}
+            <button 
+              onClick={() => setStep(6)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white p-10 rounded-[48px] shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:scale-95 flex flex-col justify-center items-center gap-4 group"
+            >
+              <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest group-hover:text-white transition-colors">
+                 {language === 'zh-CN' ? '下一步' : 'Next Step'}
+              </p>
+              <h3 className="text-2xl font-black text-center leading-tight">
+                {t.gotoSave}
+              </h3>
+              <ArrowRight className="w-8 h-8" />
+            </button>
           </div>
+
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
             <div className="xl:col-span-12 space-y-8">
               <h3 className="text-2xl font-black text-slate-800 flex items-center gap-4 tracking-tight"><CheckCircle2 className="w-8 h-8 text-emerald-500" />{t.previewTitle}</h3>
@@ -876,7 +891,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               </div>
             </div>
           </div>
-          <div className="flex justify-between items-center pt-10"><button onClick={() => { setStep(1); resetState(); }} className="px-12 py-6 bg-white border-2 border-slate-200 text-slate-500 rounded-[40px] font-black hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm uppercase tracking-widest text-xs">{t.initNew}</button><button onClick={() => setStep(6)} className="px-14 py-6 bg-indigo-600 text-white rounded-[40px] font-black hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-100 flex items-center gap-4 transform hover:-translate-y-1 text-lg">{t.gotoSave}<ArrowRight className="w-7 h-7" /></button></div>
+          
+          <div className="flex justify-start items-center pt-10">
+            <button 
+              onClick={() => { setStep(1); resetState(); }} 
+              className="px-12 py-6 bg-white border-2 border-slate-200 text-slate-500 rounded-[40px] font-black hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm uppercase tracking-widest text-xs"
+            >
+              {t.initNew}
+            </button>
+          </div>
         </div>
       )}
 
