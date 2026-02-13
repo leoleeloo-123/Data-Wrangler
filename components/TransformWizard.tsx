@@ -31,7 +31,8 @@ import {
   Check,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
-  FileOutput
+  FileOutput,
+  Copy
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -242,6 +243,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
     setSelectedDef(def);
     setActiveTemplate(tpl);
+    setNewTemplateName(tpl.name);
     setSelectedSheet(tpl.sheetName);
     setStartRow(tpl.startRow);
     setMapping(tpl.mapping);
@@ -253,10 +255,13 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setStep(4); 
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = (isNew: boolean = true) => {
     if (!selectedDef || !newTemplateName) return;
+    
+    const templateId = (isNew || !activeTemplate) ? crypto.randomUUID() : activeTemplate.id;
+
     const template: TransformationTemplate = {
-      id: crypto.randomUUID(),
+      id: templateId,
       name: newTemplateName,
       definitionId: selectedDef.id,
       sheetName: selectedSheet,
@@ -283,6 +288,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setRawPreview([]);
     setAvailableHeaders([]);
     setMapping({});
+    setNewTemplateName('');
   };
 
   const autoMap = async () => {
@@ -907,14 +913,33 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 </p>
               </div>
               <div className="pt-4">
-                <button 
-                  onClick={handleSaveTemplate} 
-                  disabled={!newTemplateName} 
-                  className="w-full bg-indigo-600 border-2 border-white/20 text-white px-10 py-6 rounded-[32px] font-black shadow-2xl hover:bg-indigo-500 transition-all transform hover:-translate-y-2 disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-3 uppercase tracking-widest"
-                >
-                  <Save className="w-6 h-6" />
-                  {t.saveFinish}
-                </button>
+                {activeTemplate ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => handleSaveTemplate(false)} 
+                      className="w-full bg-indigo-600 border-2 border-white/20 text-white px-6 py-5 rounded-[32px] font-black shadow-2xl hover:bg-indigo-500 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
+                    >
+                      <Save className="w-5 h-5" />
+                      {t.saveUpdate}
+                    </button>
+                    <button 
+                      onClick={() => handleSaveTemplate(true)} 
+                      className="w-full bg-white/10 border-2 border-white/20 text-white px-6 py-5 rounded-[32px] font-black shadow-2xl hover:bg-white/20 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
+                    >
+                      <Copy className="w-5 h-5" />
+                      {t.saveAs}
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => handleSaveTemplate(true)} 
+                    disabled={!newTemplateName} 
+                    className="w-full bg-indigo-600 border-2 border-white/20 text-white px-10 py-6 rounded-[32px] font-black shadow-2xl hover:bg-indigo-500 transition-all transform hover:-translate-y-2 disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-3 uppercase tracking-widest"
+                  >
+                    <Save className="w-6 h-6" />
+                    {t.saveFinish}
+                  </button>
+                )}
               </div>
             </div>
 
