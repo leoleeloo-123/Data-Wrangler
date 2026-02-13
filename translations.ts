@@ -80,6 +80,8 @@ export const translations = {
       newModule: 'New Definition',
       name: 'Module Name',
       desc: 'Description',
+      group: 'Group (Class)',
+      noGroup: 'Ungrouped Modules',
       fieldStructure: 'Standardized Field Structure',
       addField: 'Add Field',
       fieldName: 'Field Name',
@@ -164,6 +166,7 @@ export const translations = {
       voice: 'Voice Assistance',
       voiceDesc: 'AI Guided Navigation',
       language: 'Preferred Language',
+      manageGroups: 'Module Label Management',
       save: 'Save Settings',
     }
   },
@@ -247,6 +250,8 @@ export const translations = {
       newModule: '新建定义',
       name: '模块名称',
       desc: '描述',
+      group: '组别 (Class)',
+      noGroup: '未分类模块',
       fieldStructure: '标准化字段结构',
       addField: '添加字段',
       fieldName: '字段名称',
@@ -331,6 +336,7 @@ export const translations = {
       voice: '语音助手',
       voiceDesc: 'AI 引导导航',
       language: '首选语言',
+      manageGroups: '模块标签管理 (组别)',
       save: '保存设置',
     }
   }

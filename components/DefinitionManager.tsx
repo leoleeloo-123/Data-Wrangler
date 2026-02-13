@@ -14,19 +14,21 @@ import {
   ToggleLeft,
   Database,
   Edit,
-  ChevronDown
+  ChevronDown,
+  Tag
 } from 'lucide-react';
-import { DataDefinition, FieldDefinition, FieldType } from '../types';
+import { DataDefinition, FieldDefinition, FieldType, DataGroup } from '../types';
 import { translations } from '../translations';
 
 interface DefinitionManagerProps {
   definitions: DataDefinition[];
+  groups: DataGroup[];
   onSave: (def: DataDefinition) => void;
   onDelete: (id: string) => void;
   language: 'en-US' | 'zh-CN';
 }
 
-const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSave, onDelete, language }) => {
+const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, groups, onSave, onDelete, language }) => {
   const t = translations[language].definitions;
   const [isEditing, setIsEditing] = useState(false);
   const [currentDef, setCurrentDef] = useState<DataDefinition | null>(null);
@@ -37,7 +39,8 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
       name: '',
       description: '',
       fields: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      groupId: undefined
     });
     setIsEditing(true);
   };
@@ -78,6 +81,60 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
     setCurrentDef({ ...currentDef, fields });
   };
 
+  // Group definitions by their assigned group
+  const groupedDefinitions = groups.map(group => ({
+    group,
+    defs: definitions.filter(d => d.groupId === group.id)
+  })).filter(g => g.defs.length > 0);
+
+  const ungroupedDefs = definitions.filter(d => !d.groupId || !groups.find(g => g.id === d.groupId));
+
+  const renderCard = (def: DataDefinition) => {
+    const group = groups.find(g => g.id === def.groupId);
+    return (
+      <div key={def.id} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all group flex flex-col relative">
+        <div className="flex items-center gap-5 mb-6">
+          <div className="bg-indigo-50 p-4 rounded-xl shadow-sm flex-shrink-0">
+            <Database className="w-10 h-10 text-indigo-600" />
+          </div>
+          <div className="flex-1 min-w-0 pr-12">
+            <h3 className="text-2xl font-black text-slate-800 leading-tight truncate" title={def.name}>
+              {def.name || 'Untitled'}
+            </h3>
+            {group && (
+              <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-sm" style={{ backgroundColor: group.color }}>
+                <Tag className="w-2.5 h-2.5" />
+                {group.name}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => handleEdit(def)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 className="w-4 h-4"/></button>
+          <button onClick={() => handleDelete(def.id)} className="p-2.5 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 className="w-4 h-4"/></button>
+        </div>
+
+        <p className="text-slate-500 font-bold mb-8 line-clamp-2 leading-relaxed text-sm">{def.description || '...'}</p>
+        
+        <div className="mb-8 flex flex-wrap gap-2 min-h-[44px]">
+          {def.fields.slice(0, 4).map(f => (
+            <span key={f.id} className="text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-400 px-3 py-1.5 rounded-full border border-slate-100 whitespace-nowrap">
+              {f.name}
+            </span>
+          ))}
+          {def.fields.length > 4 && <span className="text-[10px] text-slate-400 font-black self-center">+{def.fields.length - 4}</span>}
+        </div>
+
+        <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-auto">
+          <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{def.fields.length} {language === 'zh-CN' ? '个字段' : 'Fields'}</span>
+          <span className="text-xs text-slate-400 font-bold">{t.created} {new Date(def.createdAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="px-8 py-10 max-w-[1800px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -97,47 +154,43 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
       </header>
 
       {!isEditing ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {definitions.map((def) => (
-            <div key={def.id} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all group flex flex-col relative">
-              <div className="flex items-center gap-5 mb-8">
-                <div className="bg-indigo-50 p-4 rounded-xl shadow-sm flex-shrink-0">
-                  <Database className="w-10 h-10 text-indigo-600" />
-                </div>
-                <div className="flex-1 min-w-0 pr-12">
-                  <h3 className="text-2xl font-black text-slate-800 leading-tight truncate" title={def.name}>
-                    {def.name || 'Untitled'}
-                  </h3>
-                </div>
+        <div className="space-y-16">
+          {/* Categorized Sections */}
+          {groupedDefinitions.map(({ group, defs }) => (
+            <section key={group.id} className="space-y-8 animate-in fade-in slide-in-from-left-4">
+              <div className="flex items-center gap-4">
+                <div className="w-2 h-10 rounded-full" style={{ backgroundColor: group.color }} />
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                  {group.name}
+                  <span className="text-sm font-black bg-slate-100 text-slate-400 px-3 py-1 rounded-lg">{defs.length}</span>
+                </h2>
               </div>
-
-              {/* Action Buttons - Absolute positioned for clean look with centered title */}
-              <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => handleEdit(def)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 className="w-4 h-4"/></button>
-                <button onClick={() => handleDelete(def.id)} className="p-2.5 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 className="w-4 h-4"/></button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {defs.map(renderCard)}
               </div>
-
-              <p className="text-slate-500 font-bold mb-8 line-clamp-3 leading-relaxed text-sm">{def.description || '...'}</p>
-              
-              <div className="mb-8 flex flex-wrap gap-2 min-h-[44px]">
-                {def.fields.slice(0, 4).map(f => (
-                  <span key={f.id} className="text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-400 px-3 py-1.5 rounded-full border border-slate-100 whitespace-nowrap">
-                    {f.name}
-                  </span>
-                ))}
-                {def.fields.length > 4 && <span className="text-[10px] text-slate-400 font-black self-center">+{def.fields.length - 4}</span>}
-              </div>
-
-              <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-auto">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{def.fields.length} {language === 'zh-CN' ? '个字段' : 'Fields'}</span>
-                <span className="text-xs text-slate-400 font-bold">{t.created} {new Date(def.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
+            </section>
           ))}
+
+          {/* Ungrouped Section */}
+          {ungroupedDefs.length > 0 && (
+            <section className="space-y-8 animate-in fade-in slide-in-from-left-4">
+              <div className="flex items-center gap-4">
+                <div className="w-2 h-10 rounded-full bg-slate-300" />
+                <h2 className="text-3xl font-black text-slate-400 tracking-tight flex items-center gap-3">
+                  {t.noGroup}
+                  <span className="text-sm font-black bg-slate-100 text-slate-300 px-3 py-1 rounded-lg">{ungroupedDefs.length}</span>
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {ungroupedDefs.map(renderCard)}
+              </div>
+            </section>
+          )}
+
           {definitions.length === 0 && (
-            <div className="col-span-full py-32 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
-              <Database className="w-16 h-16 text-slate-300 mx-auto mb-6 opacity-20" />
-              <p className="text-slate-500 font-bold text-xl">{t.subtitle}</p>
+            <div className="py-48 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
+              <Database className="w-20 h-20 text-slate-300 mx-auto mb-6 opacity-20" />
+              <p className="text-slate-500 font-bold text-2xl">{t.subtitle}</p>
             </div>
           )}
         </div>
@@ -161,8 +214,8 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
             </div>
           </div>
 
-          <div className="p-10 space-y-10">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="p-10 space-y-12">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</label>
@@ -175,7 +228,27 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
                   className="w-full px-6 py-4 border border-slate-200 rounded-xl font-bold text-lg text-slate-800 bg-slate-50/50 outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
                 />
               </div>
+              
               <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.group}</label>
+                </div>
+                <div className="relative">
+                  <select 
+                    value={currentDef?.groupId || ''}
+                    onChange={(e) => setCurrentDef(prev => prev ? {...prev, groupId: e.target.value || undefined} : null)}
+                    className="w-full px-6 py-4 border border-slate-200 rounded-xl font-bold text-lg text-slate-800 bg-slate-50/50 outline-none focus:ring-4 focus:ring-indigo-100 transition-all appearance-none"
+                  >
+                    <option value="">-- {language === 'zh-CN' ? '无组别' : 'No Group'} --</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-4 lg:col-span-3">
                 <div className="flex items-center gap-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.desc}</label>
                 </div>

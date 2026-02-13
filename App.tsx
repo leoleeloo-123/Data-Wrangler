@@ -5,7 +5,7 @@ import DefinitionManager from './components/DefinitionManager';
 import TransformWizard from './components/TransformWizard';
 import BatchProcessor from './components/BatchProcessor';
 import DataReview from './components/DataReview';
-import { DataDefinition, FieldType, TransformationTemplate, BatchConfiguration, BatchTask, DataReviewEntry } from './types';
+import { DataDefinition, FieldType, TransformationTemplate, BatchConfiguration, BatchTask, DataReviewEntry, DataGroup } from './types';
 import { translations } from './translations';
 import { 
   CheckCircle2, 
@@ -27,10 +27,24 @@ import {
   User as UserIcon,
   Building as BuildingIcon,
   ClipboardCheck,
-  Trash2
+  Trash2,
+  Tag,
+  Palette,
+  Plus
 } from 'lucide-react';
 
 declare const XLSX: any;
+
+const PRESET_COLORS = [
+  '#6366f1', // Indigo
+  '#ec4899', // Pink
+  '#10b981', // Emerald
+  '#f59e0b', // Amber
+  '#3b82f6', // Blue
+  '#8b5cf6', // Violet
+  '#f43f5e', // Rose
+  '#06b6d4', // Cyan
+];
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -38,6 +52,7 @@ const App: React.FC = () => {
   const [templates, setTemplates] = useState<TransformationTemplate[]>([]);
   const [batches, setBatches] = useState<BatchConfiguration[]>([]);
   const [reviewEntries, setReviewEntries] = useState<DataReviewEntry[]>([]);
+  const [groups, setGroups] = useState<DataGroup[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
@@ -46,9 +61,9 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState(localStorage.getItem('tax-user-name') || '');
   const [companyName, setCompanyName] = useState(localStorage.getItem('tax-company-name') || '');
   
-  // System Config State
+  // System Config State - Set default to en-US as requested
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [language, setLanguage] = useState<'en-US' | 'zh-CN'>('zh-CN');
+  const [language, setLanguage] = useState<'en-US' | 'zh-CN'>('en-US');
 
   const t = translations[language];
 
@@ -64,6 +79,18 @@ const App: React.FC = () => {
   // Initialize data
   useEffect(() => {
     try {
+      const savedGroups = localStorage.getItem('tax-groups');
+      if (savedGroups) {
+        setGroups(JSON.parse(savedGroups));
+      } else {
+        const initialGroups: DataGroup[] = [
+          { id: 'group-1', name: 'Domestic Tax', color: '#6366f1' },
+          { id: 'group-2', name: 'Foreign Tax', color: '#ec4899' },
+        ];
+        setGroups(initialGroups);
+        localStorage.setItem('tax-groups', JSON.stringify(initialGroups));
+      }
+
       const savedDefs = localStorage.getItem('tax-definitions');
       if (savedDefs) {
         setDefinitions(JSON.parse(savedDefs));
@@ -74,6 +101,7 @@ const App: React.FC = () => {
             name: 'VAT Monthly Sales (Standard)',
             description: 'Global standardized template for collecting monthly output VAT data from EMEA, APAC, and LATAM regions.',
             createdAt: new Date().toISOString(),
+            groupId: 'group-2',
             fields: [
               { id: 'f1', name: 'InvoiceDate', type: FieldType.DATE, required: true, description: 'Date of supply' },
               { id: 'f2', name: 'CustomerName', type: FieldType.STRING, required: true, description: 'B2B/B2C Legal Entity' },
@@ -121,6 +149,35 @@ const App: React.FC = () => {
     const updated = definitions.filter(d => d.id !== id);
     setDefinitions(updated);
     localStorage.setItem('tax-definitions', JSON.stringify(updated));
+  };
+
+  const saveGroups = (updatedGroups: DataGroup[]) => {
+    setGroups(updatedGroups);
+    localStorage.setItem('tax-groups', JSON.stringify(updatedGroups));
+  };
+
+  const addGroup = () => {
+    const newGroup: DataGroup = {
+      id: crypto.randomUUID(),
+      name: language === 'zh-CN' ? '新标签' : 'New Label',
+      color: PRESET_COLORS[groups.length % PRESET_COLORS.length]
+    };
+    saveGroups([...groups, newGroup]);
+  };
+
+  const updateGroup = (id: string, updates: Partial<DataGroup>) => {
+    const updated = groups.map(g => g.id === id ? { ...g, ...updates } : g);
+    saveGroups(updated);
+  };
+
+  const deleteGroup = (id: string) => {
+    if (confirm(language === 'zh-CN' ? '确定删除此标签吗？属于此标签的模块将变为未分类。' : 'Delete this label? Modules in this group will be ungrouped.')) {
+      saveGroups(groups.filter(g => g.id !== id));
+      // Reset groupId for definitions that were in this group
+      const updatedDefs = definitions.map(d => d.groupId === id ? { ...d, groupId: undefined } : d);
+      setDefinitions(updatedDefs);
+      localStorage.setItem('tax-definitions', JSON.stringify(updatedDefs));
+    }
   };
 
   const saveTemplate = (template: TransformationTemplate) => {
@@ -177,10 +234,12 @@ const App: React.FC = () => {
       setTemplates([]);
       setBatches([]);
       setReviewEntries([]);
+      setGroups([]);
       localStorage.removeItem('tax-definitions');
       localStorage.removeItem('tax-transformation-templates');
       localStorage.removeItem('tax-batch-configs');
       localStorage.removeItem('tax-review-entries');
+      localStorage.removeItem('tax-groups');
       alert(language === 'zh-CN' ? '所有配置已清空。' : 'All configuration has been cleared.');
     }
   };
@@ -189,12 +248,17 @@ const App: React.FC = () => {
   const exportConfig = () => {
     const wb = XLSX.utils.book_new();
     
+    // Process Groups
+    const groupSheet = XLSX.utils.json_to_sheet(groups);
+    XLSX.utils.book_append_sheet(wb, groupSheet, "Groups");
+
     // Process Definitions
     const defData = definitions.map(d => ({
       id: d.id,
       name: d.name,
       description: d.description,
       createdAt: d.createdAt,
+      groupId: d.groupId || '',
       fields: JSON.stringify(d.fields)
     }));
     const defSheet = XLSX.utils.json_to_sheet(defData);
@@ -256,6 +320,13 @@ const App: React.FC = () => {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
         
+        // Groups
+        const groupSheet = workbook.Sheets["Groups"];
+        let newGroups: DataGroup[] = [];
+        if (groupSheet) {
+          newGroups = XLSX.utils.sheet_to_json(groupSheet);
+        }
+
         // Parse Definitions
         const defSheet = workbook.Sheets["Definitions"];
         let newDefs: DataDefinition[] = [];
@@ -263,6 +334,7 @@ const App: React.FC = () => {
           const raw = XLSX.utils.sheet_to_json(defSheet);
           newDefs = raw.map((r: any) => ({
             ...r,
+            groupId: r.groupId || undefined,
             fields: typeof r.fields === 'string' ? JSON.parse(r.fields) : r.fields
           }));
         }
@@ -298,13 +370,20 @@ const App: React.FC = () => {
         }
 
         if (strategy === 'replace') {
+          setGroups(newGroups);
           setDefinitions(newDefs);
           setTemplates(newTemplates);
           setBatches(newBatches);
+          localStorage.setItem('tax-groups', JSON.stringify(newGroups));
           localStorage.setItem('tax-definitions', JSON.stringify(newDefs));
           localStorage.setItem('tax-transformation-templates', JSON.stringify(newTemplates));
           localStorage.setItem('tax-batch-configs', JSON.stringify(newBatches));
         } else {
+          const mergedGroups = [...groups];
+          newGroups.forEach(ng => {
+            if (!mergedGroups.find(g => g.id === ng.id)) mergedGroups.push(ng);
+          });
+
           const mergedDefs = [...definitions];
           newDefs.forEach(nd => {
             const idx = mergedDefs.findIndex(d => d.id === nd.id);
@@ -326,9 +405,11 @@ const App: React.FC = () => {
             else mergedBatches.push(nb);
           });
 
+          setGroups(mergedGroups);
           setDefinitions(mergedDefs);
           setTemplates(mergedTemplates);
           setBatches(mergedBatches);
+          localStorage.setItem('tax-groups', JSON.stringify(mergedGroups));
           localStorage.setItem('tax-definitions', JSON.stringify(mergedDefs));
           localStorage.setItem('tax-transformation-templates', JSON.stringify(mergedTemplates));
           localStorage.setItem('tax-batch-configs', JSON.stringify(mergedBatches));
@@ -348,7 +429,15 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'definitions':
-        return <DefinitionManager definitions={definitions} onSave={saveDefinition} onDelete={deleteDefinition} language={language} />;
+        return (
+          <DefinitionManager 
+            definitions={definitions} 
+            groups={groups}
+            onSave={saveDefinition} 
+            onDelete={deleteDefinition} 
+            language={language} 
+          />
+        );
       case 'import':
         return (
           <TransformWizard 
@@ -526,8 +615,8 @@ const App: React.FC = () => {
       {isConfigOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsConfigOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-20">
               <div className="flex items-center gap-3">
                 <div className="bg-indigo-100 p-2.5 rounded-xl">
                   <Settings className="w-6 h-6 text-indigo-600" />
@@ -542,7 +631,7 @@ const App: React.FC = () => {
               </button>
             </div>
             
-            <div className="p-10 space-y-10">
+            <div className="p-10 space-y-12">
               {/* Identity Context Inputs */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -574,6 +663,55 @@ const App: React.FC = () => {
                     placeholder="e.g. Global Tech Solutions"
                     className="w-full px-5 py-3 border border-slate-200 rounded-xl font-bold text-slate-700 bg-slate-50/50 outline-none focus:ring-4 focus:ring-emerald-100 transition-all"
                   />
+                </div>
+              </div>
+
+              {/* Group Label Management */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-amber-100 p-2.5 rounded-xl">
+                      <Tag className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest text-sm">{t.config.manageGroups}</h3>
+                  </div>
+                  <button 
+                    onClick={addGroup}
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" /> {language === 'zh-CN' ? '新增标签' : 'Add Label'}
+                  </button>
+                </div>
+                
+                <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  {groups.map((group) => (
+                    <div key={group.id} className="flex items-center gap-4 group/item">
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          value={group.color}
+                          onChange={(e) => updateGroup(group.id, { color: e.target.value })}
+                          className="w-10 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                        />
+                        <Palette className="absolute inset-0 m-auto w-4 h-4 text-white pointer-events-none drop-shadow-md" />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={group.name}
+                        onChange={(e) => updateGroup(group.id, { name: e.target.value })}
+                        className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-200 transition-all"
+                      />
+                      <button 
+                        onClick={() => deleteGroup(group.id)}
+                        className="p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover/item:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {groups.length === 0 && (
+                    <p className="text-center py-4 text-slate-400 font-bold italic text-sm">No labels created.</p>
+                  )}
                 </div>
               </div>
 

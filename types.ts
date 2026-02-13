@@ -14,12 +14,19 @@ export interface FieldDefinition {
   description: string;
 }
 
+export interface DataGroup {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface DataDefinition {
   id: string;
   name: string;
   description: string;
   fields: FieldDefinition[];
   createdAt: string;
+  groupId?: string; // Reference to DataGroup.id
 }
 
 export interface SourceConfig {
