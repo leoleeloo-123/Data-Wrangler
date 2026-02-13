@@ -99,17 +99,24 @@ const DefinitionManager: React.FC<DefinitionManagerProps> = ({ definitions, onSa
       {!isEditing ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {definitions.map((def) => (
-            <div key={def.id} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all group flex flex-col">
-              <div className="flex justify-between mb-6">
-                <div className="bg-indigo-50 p-4 rounded-xl shadow-sm">
-                  <Database className="w-8 h-8 text-indigo-600" />
+            <div key={def.id} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all group flex flex-col relative">
+              <div className="flex items-center gap-5 mb-8">
+                <div className="bg-indigo-50 p-4 rounded-xl shadow-sm flex-shrink-0">
+                  <Database className="w-10 h-10 text-indigo-600" />
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleEdit(def)} className="p-3 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-xl shadow-sm"><Edit2 className="w-5 h-5"/></button>
-                  <button onClick={() => handleDelete(def.id)} className="p-3 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-xl shadow-sm"><Trash2 className="w-5 h-5"/></button>
+                <div className="flex-1 min-w-0 pr-12">
+                  <h3 className="text-2xl font-black text-slate-800 leading-tight truncate" title={def.name}>
+                    {def.name || 'Untitled'}
+                  </h3>
                 </div>
               </div>
-              <h3 className="text-xl font-black text-slate-800 mb-3 truncate" title={def.name}>{def.name || 'Untitled'}</h3>
+
+              {/* Action Buttons - Absolute positioned for clean look with centered title */}
+              <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleEdit(def)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Edit2 className="w-4 h-4"/></button>
+                <button onClick={() => handleDelete(def.id)} className="p-2.5 text-slate-400 hover:text-red-600 bg-white border border-slate-100 rounded-xl shadow-sm transition-all"><Trash2 className="w-4 h-4"/></button>
+              </div>
+
               <p className="text-slate-500 font-bold mb-8 line-clamp-3 leading-relaxed text-sm">{def.description || '...'}</p>
               
               <div className="mb-8 flex flex-wrap gap-2 min-h-[44px]">
