@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface LayoutProps {
-  // Fixed: Use React.ReactNode instead of React.Node
+  // Fix: Change React.Node to React.ReactNode as 'Node' is not exported by 'React' in TypeScript
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;

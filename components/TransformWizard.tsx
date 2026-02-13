@@ -83,8 +83,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const [isSheetConfirmed, setIsSheetConfirmed] = useState(false);
   const [sheetSearchQuery, setSheetSearchQuery] = useState('');
   
+  // Input states (bound to form controls)
   const [startRow, setStartRow] = useState<number>(0);
   const [endRow, setEndRow] = useState<number | ''>('');
+  
+  // Applied states (used for rendering the preview and mapping logic)
+  // These only update when the user clicks "Refresh Data Preview"
+  const [appliedStartRow, setAppliedStartRow] = useState<number>(0);
+  const [appliedEndRow, setAppliedEndRow] = useState<number | ''>('');
+
   const [mapping, setMapping] = useState<Mapping>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ProcessedData | null>(null);
@@ -105,12 +112,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync state for template preview - ONLY runs when sheet is confirmed or configuration changes
+  // Initial load when sheet is confirmed
   useEffect(() => {
     if (templateFile && selectedSheet && isSheetConfirmed) {
       loadTemplatePreview();
     }
-  }, [templateFile, selectedSheet, startRow, isSheetConfirmed]);
+  }, [templateFile, selectedSheet, isSheetConfirmed]);
 
   const loadTemplatePreview = async () => {
     if (!templateFile || !selectedSheet) return;
@@ -129,9 +136,9 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             range: 0, 
             defval: "" 
           }) as any[][];
-          setRawPreview(raw.slice(0, 50));
+          setRawPreview(raw.slice(0, 100)); // Show a bit more for context
 
-          // Parse specifically the header row for field mapping
+          // Parse specifically the header row for field mapping using the CURRENT input values
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
             range: Math.max(0, Number(startRow)), 
@@ -146,6 +153,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
           } else {
             setAvailableHeaders([]);
           }
+
+          // Sync applied values only after successful parse
+          setAppliedStartRow(startRow);
+          setAppliedEndRow(endRow);
         }
       } catch (err) {
         console.error("Template preview loading error", err);
@@ -200,7 +211,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
           // Schema validation only checks the targeted sheet in the workbook
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
-            range: Math.max(0, Number(startRow)), 
+            range: Math.max(0, Number(appliedStartRow)), 
             defval: "" 
           }) as any[][];
 
@@ -284,6 +295,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setIsSheetConfirmed(true); 
     setStartRow(tpl.startRow);
     setEndRow(tpl.endRow ?? '');
+    setAppliedStartRow(tpl.startRow);
+    setAppliedEndRow(tpl.endRow ?? '');
     setMapping(tpl.mapping);
     setAvailableHeaders(tpl.expectedHeaders || []);
     setExportFileName(tpl.exportFileName);
@@ -304,8 +317,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       name: newTemplateName,
       definitionId: selectedDef.id,
       sheetName: selectedSheet,
-      startRow,
-      endRow: endRow === '' ? undefined : Number(endRow),
+      startRow: appliedStartRow,
+      endRow: appliedEndRow === '' ? undefined : Number(appliedEndRow),
       mapping,
       expectedHeaders: availableHeaders,
       exportFileName,
@@ -335,6 +348,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setFileNamePosition('front');
     setStartRow(0);
     setEndRow('');
+    setAppliedStartRow(0);
+    setAppliedEndRow('');
     setIsSheetConfirmed(false);
   };
 
@@ -361,7 +376,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setResults(null);
     
     const validFiles = batchFiles.filter(f => f.isValid && !f.isDuplicate).map(f => f.file);
-    const endRowLimit = endRow === '' ? undefined : Number(endRow);
+    const endRowLimit = appliedEndRow === '' ? undefined : Number(appliedEndRow);
 
     try {
       const allRows: any[] = [];
@@ -374,7 +389,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
 
       for (const file of validFiles) {
         // extractSheetData ensures only the configured sheet is parsed
-        const data = await extractSheetData(file, selectedSheet, Number(startRow), endRowLimit);
+        const data = await extractSheetData(file, selectedSheet, Number(appliedStartRow), endRowLimit);
         
         data.forEach((rawRow, rowIdx) => {
           const processedRow: any = {
@@ -392,10 +407,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             if (field.required && (rawValue === null || rawValue === undefined || rawValue === "")) {
               hasError = true;
               allErrors.push({
-                row: rowIdx + (Number(startRow) + 2),
+                row: rowIdx + (Number(appliedStartRow) + 2),
                 field: field.name,
                 value: rawValue,
-                message: `Required field missing in file ${file.name}`,
+                message: `Required field missing`,
                 severity: 'error'
               });
             }
@@ -405,10 +420,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               if (isNaN(numValue)) {
                 hasError = true;
                 allErrors.push({
-                  row: rowIdx + (Number(startRow) + 2),
+                  row: rowIdx + (Number(appliedStartRow) + 2),
                   field: field.name,
                   value: rawValue,
-                  message: `Non-numeric value in numeric field in file ${file.name}`,
+                  message: `Non-numeric value`,
                   severity: 'error'
                 });
               } else {
@@ -712,7 +727,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               )}
             </div>
 
-            {/* Right: Sheet Selector - Now deferring parsing until confirmation */}
+            {/* Right: Sheet Selector */}
             <div className={`bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col transition-all duration-500 ${!templateFile ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -805,8 +820,21 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="pt-6 border-t border-slate-100">
-                    <button onClick={() => setStep(3)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg">{t.continueMapping}<ArrowRight className="w-6 h-6" /></button>
+                  <div className="pt-6 border-t border-slate-100 flex flex-col gap-4">
+                    <button 
+                      onClick={loadTemplatePreview} 
+                      disabled={isProcessing}
+                      className="w-full bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-md shadow-indigo-50 transition-all transform hover:-translate-y-1 active:scale-95 text-lg"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${isProcessing ? 'animate-spin' : ''}`} />
+                      {language === 'zh-CN' ? '刷新数据预览' : 'Refresh Data Preview'}
+                    </button>
+                    <button 
+                      onClick={() => setStep(3)} 
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1 active:scale-95 text-lg"
+                    >
+                      {t.continueMapping}<ArrowRight className="w-6 h-6" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -829,18 +857,18 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                       <thead className="bg-slate-50 sticky top-0 z-20">
                         <tr>
                           <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 w-20 text-center">Row</th>
-                          {(rawPreview[startRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
+                          {(rawPreview[appliedStartRow] || []).map((_, i) => <th key={i} className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b-2 border-slate-100 whitespace-nowrap">Col {String.fromCharCode(65 + i)}</th>)}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold transition-all">
                         {rawPreview.map((row, rIdx) => {
-                          const isHeader = rIdx === startRow;
-                          if (rIdx < startRow && !showSkippedRows) return null;
-                          const endRowLimit = endRow === '' ? Infinity : Number(endRow);
+                          const isHeader = rIdx === appliedStartRow;
+                          if (rIdx < appliedStartRow && !showSkippedRows) return null;
+                          const endRowLimit = appliedEndRow === '' ? Infinity : Number(appliedEndRow);
                           if (rIdx > endRowLimit) return null;
 
                           return (
-                            <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-30' : 'hover:bg-slate-50/50'}`}>
+                            <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < appliedStartRow ? 'opacity-30' : 'hover:bg-slate-50/50'}`}>
                               <td className={`px-5 py-4 text-center border-r-2 border-slate-50 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-300'}`}>{rIdx}</td>
                               {row.map((cell: any, cIdx: number) => <td key={cIdx} className={`px-6 py-4 whitespace-nowrap truncate max-w-[250px] ${isHeader ? 'font-black text-indigo-900 bg-indigo-50/30' : 'text-slate-600'}`}>{cell}</td>)}
                             </tr>
@@ -1129,8 +1157,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               <div className="space-y-3 flex-1">
                 {[
                   { label: 'Sheet', val: selectedSheet },
-                  { label: 'Header Row', val: startRow },
-                  { label: 'End Row', val: endRow === '' ? 'All' : endRow },
+                  { label: 'Header Row', val: appliedStartRow },
+                  { label: 'End Row', val: appliedEndRow === '' ? 'All' : appliedEndRow },
                   { label: 'Files', val: `${batchFiles.filter(f => f.isValid).length}` }
                 ].map((row, idx) => (
                   <div key={idx} className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
