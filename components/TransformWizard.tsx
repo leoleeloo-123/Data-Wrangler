@@ -33,7 +33,8 @@ import {
   ChevronRight as ChevronRightIcon,
   FileOutput,
   Copy,
-  TableProperties
+  TableProperties,
+  CopyX
 } from 'lucide-react';
 import { DataDefinition, Mapping, ValidationError, ProcessedData, FieldType, TransformationTemplate } from '../types';
 import { parseExcelMetadata, extractSheetData, ExcelSheetInfo } from '../services/excelService';
@@ -46,6 +47,7 @@ declare const XLSX: any;
 interface FileValidationResult {
   fileName: string;
   isValid: boolean;
+  isDuplicate?: boolean;
   error?: string;
   file: File;
 }
@@ -223,9 +225,23 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       const newFiles = Array.from(e.target.files) as File[];
       const validationResults: FileValidationResult[] = [];
       
+      // Use existing files for duplicate check (matching by name and size)
+      const currentFilesInfo = batchFiles.map(f => `${f.fileName}_${f.file.size}`);
+
       for (const file of newFiles) {
+        const fileKey = `${file.name}_${file.size}`;
+        const isDuplicate = currentFilesInfo.includes(fileKey);
+        
+        // Add to tracking to detect duplicates within the current selection batch too
+        if (!isDuplicate) currentFilesInfo.push(fileKey);
+
         const res = await validateFileSchema(file);
-        validationResults.push(res);
+        validationResults.push({
+          ...res,
+          isDuplicate,
+          // If it's a duplicate, we mark it invalid for processing purposes or just flag it
+          isValid: isDuplicate ? false : res.isValid
+        });
       }
       
       setBatchFiles(prev => [...prev, ...validationResults]);
@@ -238,7 +254,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   };
 
   const removeAllValid = () => {
-    setBatchFiles(prev => prev.filter(f => !f.isValid));
+    setBatchFiles(prev => prev.filter(f => !f.isValid && !f.isDuplicate));
+  };
+
+  const removeAllDuplicates = () => {
+    setBatchFiles(prev => prev.filter(f => !f.isDuplicate));
   };
 
   const applyTemplate = (tpl: TransformationTemplate) => {
@@ -327,7 +347,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setIsProcessing(true);
     setResults(null);
     
-    const validFiles = batchFiles.filter(f => f.isValid).map(f => f.file);
+    // Only process valid and non-duplicate files
+    const validFiles = batchFiles.filter(f => f.isValid && !f.isDuplicate).map(f => f.file);
     const endRowLimit = endRow === '' ? undefined : Number(endRow);
 
     try {
@@ -436,7 +457,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, exportSheetName || 'Sheet1');
-      XLSX.writeFile(workbook, `${exportFileName || 'Standardized_Data'}.xlsx`);
+      XLSX.writeFile(workbook, `${exportFileName || 'Standardized_Tax_Data'}.xlsx`);
     } catch (err) {
       console.error("Export failed", err);
       alert(language === 'zh-CN' ? '导出失败，请检查设置' : 'Export failed, check settings');
@@ -494,12 +515,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     }
   };
 
-  const validBatchFiles = batchFiles.filter(f => f.isValid);
-  const invalidBatchFiles = batchFiles.filter(f => !f.isValid);
+  const validBatchFiles = batchFiles.filter(f => f.isValid && !f.isDuplicate);
+  const invalidBatchFiles = batchFiles.filter(f => !f.isValid && !f.isDuplicate);
+  const duplicateBatchFiles = batchFiles.filter(f => f.isDuplicate);
   
   const validCount = validBatchFiles.length;
   const invalidCount = invalidBatchFiles.length;
-  const allBatchFilesValid = batchFiles.length > 0 && invalidCount === 0;
+  const duplicateCount = duplicateBatchFiles.length;
+  const hasIssues = invalidCount > 0 || duplicateCount > 0;
+  const allBatchFilesValid = batchFiles.length > 0 && !hasIssues;
 
   const getValidFilesString = () => {
     if (validCount === 0) return '';
@@ -819,7 +843,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Files className="w-5 h-5 text-indigo-500" />{t.validationTitle}</h3>
                     <div className="flex gap-4">
                       <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-5 py-2 rounded-full border border-emerald-100 shadow-sm">{validCount} {t.validFiles}</span>
-                      <span className={`text-[11px] font-black px-5 py-2 rounded-full border shadow-sm ${invalidCount > 0 ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-300 bg-white border-slate-100'}`}>{invalidCount} {t.invalidFiles}</span>
+                      <span className={`text-[11px] font-black px-5 py-2 rounded-full border shadow-sm ${invalidCount > 0 ? 'text-amber-600 bg-amber-50 border-amber-100' : 'text-slate-300 bg-white border-slate-100'}`}>{invalidCount} {t.invalidFiles}</span>
+                      {duplicateCount > 0 && <span className="text-[11px] font-black text-red-600 bg-red-50 px-5 py-2 rounded-full border border-red-100 shadow-sm">{duplicateCount} {t.duplicatedFiles}</span>}
                     </div>
                   </div>
                   <div className="max-h-[600px] overflow-y-auto custom-scrollbar divide-y-2 divide-slate-50">
@@ -845,16 +870,39 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                         </button>
                       </div>
                     )}
-                    
-                    {invalidBatchFiles.map((res, i) => (
-                      <div key={res.fileName + i} className="p-8 flex items-center justify-between hover:bg-red-50/10 transition-colors">
-                        <div className="flex items-center gap-8 overflow-hidden">
-                          <div className="p-4 rounded-2xl bg-white shadow-sm">
-                            <AlertCircle className="w-6 h-6 text-red-500" />
+
+                    {duplicateCount > 0 && (
+                      <div className="p-8 flex items-start justify-between bg-red-50/20 group transition-colors hover:bg-red-50/40 border-b border-red-100">
+                        <div className="flex items-start gap-8">
+                          <div className="p-4 rounded-2xl bg-white shadow-sm ring-2 ring-red-100">
+                            <CopyX className="w-6 h-6 text-red-600" />
                           </div>
                           <div className="overflow-hidden">
-                            <p className="font-black truncate text-red-900 text-lg">{res.fileName}</p>
-                            <p className="text-xs font-bold uppercase tracking-widest mt-2 text-red-400 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-200" />{res.error}</p>
+                            <p className="font-black text-red-900 text-lg">{t.duplicatedFiles}</p>
+                            <p className="text-sm font-bold text-red-600 mt-2 leading-relaxed">
+                              {duplicateBatchFiles.map(f => f.fileName).join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={removeAllDuplicates}
+                          className="p-4 text-red-300 hover:text-red-600 transition-all hover:bg-white rounded-2xl shadow-sm"
+                          title={language === 'zh-CN' ? '移除所有重复文件' : 'Remove all duplicates'}
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    {invalidBatchFiles.map((res, i) => (
+                      <div key={res.fileName + i} className="p-8 flex items-center justify-between hover:bg-amber-50/10 transition-colors">
+                        <div className="flex items-center gap-8 overflow-hidden">
+                          <div className="p-4 rounded-2xl bg-white shadow-sm">
+                            <AlertCircle className="w-6 h-6 text-amber-500" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="font-black truncate text-slate-800 text-lg">{res.fileName}</p>
+                            <p className="text-xs font-bold uppercase tracking-widest mt-2 text-amber-600 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-200" />{res.error}</p>
                           </div>
                         </div>
                         <button 
@@ -873,11 +921,11 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
               )}
             </div>
             <div className="lg:col-span-4 space-y-8">
-              <div className={`bg-white p-12 rounded-[56px] border shadow-2xl transition-all h-fit ${batchFiles.length === 0 ? 'opacity-40' : allBatchFilesValid ? 'border-emerald-200 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/30'}`}>
+              <div className={`bg-white p-12 rounded-[56px] border shadow-2xl transition-all h-fit ${batchFiles.length === 0 ? 'opacity-40' : allBatchFilesValid ? 'border-emerald-200 bg-emerald-50/30' : (duplicateCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-amber-100 bg-amber-50/30')}`}>
                 {batchFiles.length === 0 ? <div className="text-center py-20"><Info className="w-20 h-20 text-slate-100 mx-auto mb-6" /><p className="text-slate-400 font-black uppercase tracking-widest text-xs">{t.noFiles}</p></div> : 
                   <div className="space-y-10">
                     <div className="flex items-center gap-6">
-                      <div className={`p-6 rounded-[32px] ${allBatchFilesValid ? 'bg-emerald-500' : 'bg-amber-500'} text-white shadow-lg`}>
+                      <div className={`p-6 rounded-[32px] ${allBatchFilesValid ? 'bg-emerald-500' : (duplicateCount > 0 ? 'bg-red-500' : 'bg-amber-500')} text-white shadow-lg`}>
                         {allBatchFilesValid ? <CheckCircle2 className="w-10 h-10" /> : <AlertCircle className="w-10 h-10" />}
                       </div>
                       <div>
@@ -887,9 +935,12 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       <div className="p-6 bg-white rounded-3xl border border-slate-50 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t.validFiles}</p><p className="text-3xl font-black text-emerald-600">{validCount}</p></div>
-                      <div className="p-6 bg-white rounded-3xl border border-slate-50 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t.invalidFiles}</p><p className={`text-3xl font-black ${invalidCount > 0 ? 'text-red-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
+                      <div className="p-6 bg-white rounded-3xl border border-slate-50 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t.invalidFiles}</p><p className={`text-3xl font-black ${invalidCount > 0 ? 'text-amber-500' : 'text-slate-300'}`}>{invalidCount}</p></div>
+                      {duplicateCount > 0 && (
+                        <div className="p-6 bg-white rounded-3xl border border-red-100 shadow-sm col-span-2"><p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">{t.duplicatedFiles}</p><p className="text-3xl font-black text-red-600">{duplicateCount}</p></div>
+                      )}
                     </div>
-                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-8 rounded-[40px] font-black flex items-center justify-center gap-5 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:scale-95 disabled:opacity-50 disabled:transform-none text-xl">{isProcessing ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Sparkles className="w-8 h-8" />}{t.execute}</button>
+                    <button onClick={runTransformation} disabled={isProcessing || batchFiles.length === 0 || !batchFiles.some(f => f.isValid && !f.isDuplicate)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-8 rounded-[40px] font-black flex items-center justify-center gap-5 shadow-2xl shadow-indigo-100 transition-all transform hover:-translate-y-2 active:scale-95 disabled:opacity-50 disabled:transform-none text-xl">{isProcessing ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Sparkles className="w-8 h-8" />}{t.execute}</button>
                   </div>
                 }
               </div>
