@@ -330,7 +330,8 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
            fieldMetadata: def.fields.map(f => ({
              name: f.name,
              type: f.type,
-             mismatchCount: task.results?.fieldStats[f.name]?.mismatchCount || 0
+             // Fix: Access mismatchCount from results.fieldStats instead of the field definition
+             mismatchCount: task.results?.fieldStats?.[f.name]?.mismatchCount || 0
            }))
         };
     });
@@ -596,7 +597,7 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({
                                 </div>
 
                                 <div className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-200 hover:border-indigo-400 transition-all relative text-center group/upload overflow-hidden">
-                                   <input type="file" multiple onChange={(e) => handleFileChange(task.id, e.target.files)} className="absolute inset-0 opacity-0 cursor-pointer z-10" accept=".xlsx, .xls" />
+                                   <input type="file" multiple onChange={(e) => handleFileChange(task.id, e.target.files)} className="absolute inset-0 opacity-0 cursor-pointer z-10" accept=".xlsx, .xls, .xlsm" />
                                    <div className="space-y-2 relative z-0">
                                       {files.length > 0 ? (
                                         <div className="flex items-center justify-center gap-4">

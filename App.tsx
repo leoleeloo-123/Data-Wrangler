@@ -804,7 +804,7 @@ const App: React.FC = () => {
                    <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center hover:border-indigo-400 transition-all cursor-pointer group">
                       <input 
                         type="file" 
-                        accept=".xlsx, .xls"
+                        accept=".xlsx, .xls, .xlsm"
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
