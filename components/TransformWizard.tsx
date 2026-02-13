@@ -77,6 +77,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
   const [sheetMetadata, setSheetMetadata] = useState<ExcelSheetInfo[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [startRow, setStartRow] = useState<number>(0);
+  const [endRow, setEndRow] = useState<number | ''>('');
   const [mapping, setMapping] = useState<Mapping>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ProcessedData | null>(null);
@@ -119,7 +120,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
             range: 0, 
             defval: "" 
           }) as any[][];
-          setRawPreview(raw.slice(0, 30));
+          setRawPreview(raw.slice(0, 50));
 
           const headerRows = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1, 
@@ -249,6 +250,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setNewTemplateName(tpl.name);
     setSelectedSheet(tpl.sheetName);
     setStartRow(tpl.startRow);
+    setEndRow(tpl.endRow ?? '');
     setMapping(tpl.mapping);
     setAvailableHeaders(tpl.expectedHeaders || []);
     setExportFileName(tpl.exportFileName);
@@ -271,6 +273,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       definitionId: selectedDef.id,
       sheetName: selectedSheet,
       startRow,
+      endRow: endRow === '' ? undefined : Number(endRow),
       mapping,
       expectedHeaders: availableHeaders,
       exportFileName,
@@ -298,6 +301,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setNewTemplateName('');
     setIncludeFileName(true);
     setFileNamePosition('front');
+    setStartRow(0);
+    setEndRow('');
   };
 
   const autoMap = async () => {
@@ -323,7 +328,8 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
     setResults(null);
     
     const validFiles = batchFiles.filter(f => f.isValid).map(f => f.file);
-    
+    const endRowLimit = endRow === '' ? undefined : Number(endRow);
+
     try {
       const allRows: any[] = [];
       const allErrors: ValidationError[] = [];
@@ -335,7 +341,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
       });
 
       for (const file of validFiles) {
-        const data = await extractSheetData(file, selectedSheet, Number(startRow));
+        const data = await extractSheetData(file, selectedSheet, Number(startRow), endRowLimit);
         
         data.forEach((rawRow, rowIdx) => {
           const processedRow: any = {
@@ -684,9 +690,15 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                       <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.headerIndex}</label>
-                    <input type="number" min="0" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 0)} className="w-full px-6 py-6 border border-slate-200 rounded-3xl font-black text-center text-4xl shadow-sm text-indigo-600 outline-none bg-slate-50/50 focus:ring-8 focus:ring-indigo-50 transition-all" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.headerIndex}</label>
+                      <input type="number" min="0" value={startRow} onChange={(e) => setStartRow(parseInt(e.target.value) || 0)} className="w-full px-6 py-6 border border-slate-200 rounded-3xl font-black text-center text-4xl shadow-sm text-indigo-600 outline-none bg-slate-50/50 focus:ring-8 focus:ring-indigo-50 transition-all" />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="block text-sm font-black text-slate-400 uppercase tracking-widest">{t.endRowIndex}</label>
+                      <input type="number" min="0" value={endRow} placeholder={t.endRowPlaceholder} onChange={(e) => setEndRow(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full px-6 py-6 border border-slate-200 rounded-3xl font-black text-center text-4xl shadow-sm text-slate-400 outline-none bg-slate-50/50 focus:ring-8 focus:ring-indigo-50 transition-all focus:text-indigo-600" />
+                    </div>
                   </div>
                 </div>
                 <div className="pt-6 border-t border-slate-100">
@@ -714,6 +726,10 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                         {rawPreview.map((row, rIdx) => {
                           const isHeader = rIdx === startRow;
                           if (rIdx < startRow && !showSkippedRows) return null;
+                          // Optional end row preview logic
+                          const endRowLimit = endRow === '' ? Infinity : Number(endRow);
+                          if (rIdx > endRowLimit) return null;
+
                           return (
                             <tr key={rIdx} className={`transition-all ${isHeader ? 'bg-indigo-50/50' : rIdx < startRow ? 'opacity-30' : 'hover:bg-slate-50/50'}`}>
                               <td className={`px-6 py-5 text-center border-r-2 border-slate-50 font-black ${isHeader ? 'text-indigo-600' : 'text-slate-300'}`}>{rIdx}</td>
@@ -1004,6 +1020,7 @@ const TransformWizard: React.FC<TransformWizardProps> = ({
                 {[
                   { label: 'Sheet', val: selectedSheet },
                   { label: 'Header Row', val: startRow },
+                  { label: 'End Row', val: endRow === '' ? 'All' : endRow },
                   { label: 'Batch Files', val: `${batchFiles.filter(f => f.isValid).length} Valid` }
                 ].map((row, idx) => (
                   <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">

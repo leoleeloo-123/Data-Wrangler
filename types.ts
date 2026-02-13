@@ -53,6 +53,7 @@ export interface TransformationTemplate {
   definitionId: string;
   sheetName: string;
   startRow: number;
+  endRow?: number; // Optional end row limit
   mapping: Mapping;
   expectedHeaders: string[]; // Added to allow validation without re-uploading file
   exportFileName: string;

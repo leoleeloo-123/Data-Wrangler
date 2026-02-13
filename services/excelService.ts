@@ -37,7 +37,8 @@ export const parseExcelMetadata = async (file: File): Promise<ExcelSheetInfo[]> 
 export const extractSheetData = async (
   file: File, 
   sheetName: string, 
-  startRow: number
+  startRow: number,
+  endRow?: number
 ): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -52,8 +53,19 @@ export const extractSheetData = async (
         const json = XLSX.utils.sheet_to_json(worksheet, { 
           range: startRow,
           defval: null
-        });
-        resolve(json);
+        }) as any[];
+
+        // If endRow is specified, slice the array.
+        // startRow is where headers are. Data starts at startRow + 1.
+        // If startRow = 2 (Excel Row 3), headers are at index 2.
+        // sheet_to_json with range: 2 returns objects starting from Row 4 (index 3).
+        // If endRow = 30, we want to stop after index 30 in the sheet.
+        if (endRow !== undefined && endRow !== null) {
+          const limit = Math.max(0, endRow - startRow);
+          resolve(json.slice(0, limit));
+        } else {
+          resolve(json);
+        }
       } catch (err) {
         reject(err);
       }

@@ -147,6 +147,7 @@ const App: React.FC = () => {
       definitionId: tpl.definitionId,
       sheetName: tpl.sheetName,
       startRow: tpl.startRow,
+      endRow: tpl.endRow ?? '',
       exportFileName: tpl.exportFileName,
       exportSheetName: tpl.exportSheetName,
       updatedAt: tpl.updatedAt,
@@ -197,7 +198,8 @@ const App: React.FC = () => {
             mapping: typeof r.mapping === 'string' ? JSON.parse(r.mapping) : r.mapping,
             expectedHeaders: typeof r.expectedHeaders === 'string' ? JSON.parse(r.expectedHeaders) : (r.expectedHeaders || []),
             includeFileName: Number(r.includeFileName) === 1,
-            fileNamePosition: r.fileNamePosition || 'front'
+            fileNamePosition: r.fileNamePosition || 'front',
+            endRow: r.endRow !== '' ? Number(r.endRow) : undefined
           }));
         }
 
